@@ -196,22 +196,24 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
         finally:
             connection.close()
 
-    def list(self, user_id: int, limit: int) -> list[dict[str, Any]]:
+    def list(self, user_id: int, limit: int, resume_id: int | None = None) -> list[dict[str, Any]]:
         safe_limit = max(1, min(int(limit or 20), 200))
         connection = self._connect()
         try:
             with connection.cursor() as cursor:
-                cursor.execute(
-                    """
+                sql = """
                     SELECT session_id, user_id, resume_id, mode, status, duration_minutes, elapsed_seconds,
                            memory_summary, final_evaluation_json, resume_snapshot_json, created_at, updated_at
                     FROM interview_sessions
                     WHERE user_id = %s
-                    ORDER BY updated_at DESC
-                    LIMIT %s
-                    """,
-                    (int(user_id), safe_limit),
-                )
+                """
+                params: list[Any] = [int(user_id)]
+                if resume_id is not None:
+                    sql += " AND resume_id = %s"
+                    params.append(int(resume_id))
+                sql += " ORDER BY updated_at DESC LIMIT %s"
+                params.append(safe_limit)
+                cursor.execute(sql, tuple(params))
                 return self._hydrate_sessions(cursor, list(cursor.fetchall()))
         finally:
             connection.close()

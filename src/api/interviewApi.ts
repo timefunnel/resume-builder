@@ -6,8 +6,11 @@ export function getInterviewTurnStreamEndpoint(): string {
   return `${API_BASE_PATH}/ai/interview/turn/stream`
 }
 
-export function getInterviewSessionsEndpoint(limit?: number): string {
-  const query = typeof limit === 'number' && Number.isFinite(limit) ? `?limit=${Math.max(1, Math.floor(limit))}` : ''
+export function getInterviewSessionsEndpoint(limit?: number, resumeId?: number | null): string {
+  const params = new URLSearchParams()
+  if (typeof limit === 'number' && Number.isFinite(limit)) params.set('limit', String(Math.max(1, Math.floor(limit))))
+  if (typeof resumeId === 'number' && Number.isFinite(resumeId) && resumeId > 0) params.set('resumeId', String(Math.floor(resumeId)))
+  const query = params.toString() ? `?${params.toString()}` : 
   return `${API_BASE_PATH}/ai/interview/sessions${query}`
 }
 
@@ -31,8 +34,8 @@ export async function postInterviewTurnStream(
   })
 }
 
-export async function getInterviewSessions(limit = 20, signal?: AbortSignal): Promise<Response> {
-  return fetch(getInterviewSessionsEndpoint(limit), {
+export async function getInterviewSessions(limit = 20, resumeId?: number | null, signal?: AbortSignal): Promise<Response> {
+  return fetch(getInterviewSessionsEndpoint(limit, resumeId), {
     method: 'GET',
     headers: {
       Accept: 'application/json',

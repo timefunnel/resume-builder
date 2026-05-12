@@ -229,6 +229,7 @@ function normalizeSessionSummary(input: unknown): InterviewSessionSummary {
 
   return {
     sessionId: String(source.sessionId ?? '').trim(),
+    resumeId: source.resumeId == null ? null : Number(source.resumeId) || null,
     mode: normalizeSessionMode(source.mode),
     status: normalizeSessionStatus(source.status),
     durationMinutes: Math.max(1, Number(source.durationMinutes ?? 0) || 60),
@@ -265,6 +266,7 @@ function normalizeSessionDetail(input: unknown): InterviewSessionDetail {
 
   return {
     sessionId: String(source.sessionId ?? '').trim(),
+    resumeId: source.resumeId == null ? null : Number(source.resumeId) || null,
     mode: normalizeSessionMode(source.mode),
     status: normalizeSessionStatus(source.status),
     durationMinutes: Math.max(1, Number(source.durationMinutes ?? 0) || 60),
@@ -293,8 +295,8 @@ export async function requestInterviewTurn(
   return normalized
 }
 
-export async function listInterviewSessions(limit = 20, signal?: AbortSignal): Promise<InterviewSessionSummary[]> {
-  const response = await fetchInterviewSessionsResponse(limit, signal)
+export async function listInterviewSessions(limit = 20, resumeId?: number | null, signal?: AbortSignal): Promise<InterviewSessionSummary[]> {
+  const response = await fetchInterviewSessionsResponse(limit, resumeId, signal)
   if (!response.ok) {
     const errorText = extractErrorText(await response.text().catch(() => ''))
     throw new Error(`Fetch interview sessions failed (${response.status}): ${errorText || response.statusText}`)

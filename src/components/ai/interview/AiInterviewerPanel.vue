@@ -65,6 +65,7 @@ const aiConfigStore = useAiConfigStore()
 type SpeechEngine = 'realtime' | 'browser'
 type SpeechUiState = Exclude<SpeechRuntimeState, 'closed'> | 'idle'
 type FloatingPanel = 'mode' | 'controls'
+type HistoryScope = 'current-resume' | 'all'
 
 const BACKEND_SPEECH_AUTO_DISABLE_THRESHOLD = 2
 
@@ -92,6 +93,7 @@ const sessionHistory = ref<InterviewSessionSummary[]>([])
 const selectedSessionId = ref('')
 const loadingSessionHistory = ref(false)
 const sessionFinished = ref(false)
+const historyScope = ref<HistoryScope>('current-resume')
 const speechUiState = ref<SpeechUiState>('idle')
 
 const totalSeconds = computed(() => Math.max(durationMinutes.value, 1) * 60)
@@ -549,9 +551,10 @@ function applySessionDetail(detail: Awaited<ReturnType<typeof getInterviewSessio
 }
 
 async function refreshSessionHistory(preferredSessionId?: string) {
+  const scopedResumeId = historyScope.value === 'current-resume' ? (resumeStore.cloudResumeId || null) : null
   loadingSessionHistory.value = true
   try {
-    const sessions = await listInterviewSessions(30)
+    const sessions = await listInterviewSessions(30, scopedResumeId)
     sessionHistory.value = sessions
 
     const targetSessionId =
@@ -608,6 +611,11 @@ async function handleSessionSelectionChange() {
 }
 
 function handleRefreshSessionHistory() {
+  void refreshSessionHistory(selectedSessionId.value || currentSessionId.value)
+}
+
+function handleHistoryScopeChange(scope: HistoryScope) {
+  historyScope.value = scope
   void refreshSessionHistory(selectedSessionId.value || currentSessionId.value)
 }
 async function runInterview(command: InterviewCommand, userInput?: string) {
@@ -1092,6 +1100,9 @@ onUnmounted(() => {
   opacity: 0.65;
 }
 
+.history-scope-toggle { display:inline-flex; gap:6px; margin-right:8px; }
+.history-scope-btn { height:30px; padding:0 10px; border-radius:999px; border:1px solid #dfd2c2; background:#fff; color:#7b6a5b; font-size:12px; font-weight:800; }
+.history-scope-btn.active { background:#2d2521; border-color:#2d2521; color:#fff; }
 .history-refresh-btn {
   width: 34px;
   height: 34px;
@@ -1467,7 +1478,10 @@ onUnmounted(() => {
     padding: 0 7px;
   }
 
-  .history-refresh-btn {
+  .history-scope-toggle { display:inline-flex; gap:6px; margin-right:8px; }
+.history-scope-btn { height:30px; padding:0 10px; border-radius:999px; border:1px solid #dfd2c2; background:#fff; color:#7b6a5b; font-size:12px; font-weight:800; }
+.history-scope-btn.active { background:#2d2521; border-color:#2d2521; color:#fff; }
+.history-refresh-btn {
     width: 32px;
     height: 30px;
     border-radius: 8px;

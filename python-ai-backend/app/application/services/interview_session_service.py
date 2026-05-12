@@ -142,7 +142,6 @@ def _session_to_summary(session: dict[str, Any]) -> dict[str, Any]:
     return {
         "sessionId": session.get("sessionId"),
         "resumeId": session.get("resumeId"),
-        "resumeId": session.get("resumeId"),
         "mode": session.get("mode", "candidate"),
         "status": session.get("status", "active"),
         "durationMinutes": session.get("durationMinutes", 60),
@@ -173,8 +172,8 @@ def _session_to_detail(session: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def list_interview_sessions(user_id: int, limit: int, repository: InterviewSessionRepository) -> list[dict[str, Any]]:
-    sessions = repository.list(user_id, limit)
+def list_interview_sessions(user_id: int, limit: int, repository: InterviewSessionRepository, resume_id: int | None = None) -> list[dict[str, Any]]:
+    sessions = repository.list(user_id, limit, resume_id=resume_id)
     sessions.sort(key=lambda item: str(item.get("updatedAt") or ""), reverse=True)
     return [_session_to_summary(item) for item in sessions[:limit]]
 

@@ -34,8 +34,8 @@ def interview_turn_stream(request: InterviewTurnRequest, current_user=Depends(ge
 
 
 @router.get("/sessions")
-def list_interview_sessions_route(limit: int = Query(default=20, ge=1, le=200), current_user=Depends(get_current_user)) -> list[dict[str, Any]]:
-    return list_interview_sessions_use_case(current_user.id, limit)
+def list_interview_sessions_route(limit: int = Query(default=20, ge=1, le=200), resumeId: int | None = Query(default=None, ge=1), current_user=Depends(get_current_user)) -> list[dict[str, Any]]:
+    return list_interview_sessions_use_case(current_user.id, limit, resume_id=resumeId)
 
 
 @router.get("/sessions/{session_id}")
