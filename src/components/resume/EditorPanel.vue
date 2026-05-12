@@ -30,6 +30,8 @@ const resumeTitleInputRef = ref<HTMLInputElement | null>(null)
 const titleDirty = ref(false)
 const aiImportInputRef = ref<HTMLInputElement | null>(null)
 const aiImporting = ref(false)
+const aiImportError = ref('')
+const aiImportSuccess = ref('')
 const aiImportedDraft = ref<{ title: string; content: Record<string, unknown>; extractedText: string } | null>(null)
 
 function handleAiClick() {
@@ -220,6 +222,8 @@ async function handleDeleteResume() {
 
 function triggerAiImport() {
   if (aiImporting.value) return
+  aiImportError.value = ''
+  aiImportSuccess.value = ''
   aiImportInputRef.value?.click()
 }
 
@@ -229,6 +233,8 @@ async function handleAiImport(event: Event) {
   if (!file) return
   input.value = ''
   aiImporting.value = true
+  aiImportError.value = ''
+  aiImportSuccess.value = ''
   try {
     const response = await importResumeWithAi(file)
     const payload = await response.json().catch(() => null)
@@ -241,8 +247,10 @@ async function handleAiImport(event: Event) {
         content: payload.content,
         extractedText: typeof payload.extractedText === 'string' ? payload.extractedText : '',
       }
+      aiImportSuccess.value = 'AI 已完成简历解析，请先预览结果再决定如何导入。'
     }
   } catch (error) {
+    aiImportError.value = error instanceof Error ? error.message : 'AI 导入失败'
     console.warn('Failed to import resume with AI', error)
   } finally {
     aiImporting.value = false
@@ -255,6 +263,7 @@ function applyImportedDraftToCurrent() {
   store.importResumeData(JSON.stringify(aiImportedDraft.value.content))
   resumeTitleDraft.value = aiImportedDraft.value.title
   aiImportedDraft.value = null
+  aiImportSuccess.value = '导入结果已应用到当前简历。'
 }
 
 async function saveImportedDraftAsNewResume() {
@@ -265,6 +274,7 @@ async function saveImportedDraftAsNewResume() {
     resumeTitleDraft.value = aiImportedDraft.value.title || created?.title || '导入的简历'
     await store.saveToCloud(resumeTitleDraft.value)
     aiImportedDraft.value = null
+    aiImportSuccess.value = 'AI 导入结果已另存为一份新简历。'
   } catch (error) {
     console.warn('Failed to save imported draft as new resume', error)
   }
@@ -272,6 +282,7 @@ async function saveImportedDraftAsNewResume() {
 
 function dismissImportedDraft() {
   aiImportedDraft.value = null
+  aiImportSuccess.value = ''
 }
 
 function triggerJsonImport() {
@@ -609,6 +620,9 @@ onUnmounted(() => {
         <p v-if="showSaved" class="save-hint">已保存</p>
       </transition>
 
+      <p v-if="aiImportError" class="ai-import-feedback error">{{ aiImportError }}</p>
+      <p v-if="aiImportSuccess && !aiImportedDraft" class="ai-import-feedback success">{{ aiImportSuccess }}</p>
+
       <div v-if="aiImportedDraft" class="ai-import-result">
         <div class="ai-import-result-copy">
           <strong>AI 已完成简历解析：{{ aiImportedDraft.title }}</strong>
@@ -678,6 +692,9 @@ onUnmounted(() => {
 <style scoped src="./EditorPanel.css"></style>
 <style scoped src="./EditorPanel.responsive.css"></style>
 <style scoped>
+.ai-import-feedback { margin:14px 0 0; padding:10px 12px; border-radius:12px; font-size:12px; font-weight:700; }
+.ai-import-feedback.error { background:#fff1f1; color:#b42318; border:1px solid #f1c7c7; }
+.ai-import-feedback.success { background:#effaf3; color:#117a37; border:1px solid #cdebd5; }
 .ai-import-result { margin: 14px 0 0; padding: 14px 16px; border: 1px solid #e7d8c8; border-radius: 16px; background: #fff8f1; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .ai-import-result-copy strong { display:block; margin-bottom: 4px; color:#2d2521; }
 .ai-import-result-copy p { margin:0; color:#7b6a5b; font-size:12px; line-height:1.6; }
