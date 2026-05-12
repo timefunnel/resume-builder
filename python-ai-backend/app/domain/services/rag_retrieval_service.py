@@ -11,8 +11,8 @@ class RagRetrieverService:
         # 避免在请求链路构建阶段做重量级 import 探测，防止阻塞“结束并评分”流。
         self.llamaindex_available = False
 
-    def query(self, query: str, top_k: int) -> tuple[str, list[dict[str, Any]]]:
-        sources = self.vector_store.similarity_search(query=query, top_k=top_k)
+    def query(self, user_id: int, query: str, top_k: int) -> tuple[str, list[dict[str, Any]]]:
+        sources = self.vector_store.similarity_search(query=query, top_k=top_k, user_id=user_id)
         return self.build_answer_from_sources(sources), sources
 
     def ingest_documents(self, documents: list[dict[str, Any]]) -> int:

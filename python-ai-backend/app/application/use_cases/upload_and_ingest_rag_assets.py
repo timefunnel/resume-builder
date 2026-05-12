@@ -117,6 +117,7 @@ def upload_and_ingest_rag_assets(
                 source_type=extracted.source_type,
                 ingest_source=extracted.ingest_source,
                 content=normalized_content,
+                user_id=extracted.user_id,
                 metadata=extracted.metadata,
             )
             _log_upload(
@@ -216,6 +217,7 @@ def upload_and_ingest_rag_assets(
             inserted_count = vector_store.add_documents_with_embeddings(
                 documents=[
                     {
+                        "user_id": chunk.user_id,
                         "source_id": chunk.source_id,
                         "content": chunk.content,
                         "metadata": chunk.metadata,
@@ -321,6 +323,7 @@ def _extract_document(asset: RagUploadAssetDto, file_parser, image_ocr) -> Extra
             source_type="image",
             ingest_source="image_ocr_text",
             content=markdown,
+            user_id=asset.user_id,
         )
     return file_parser.parse(
         file_bytes=file_bytes,
@@ -335,6 +338,7 @@ def _materialize_asset(asset: RagUploadAssetDto, max_file_size_mb: int) -> RagUp
     return RagUploadAssetDto(
         file_name=asset.file_name,
         content_type=asset.content_type,
+        user_id=asset.user_id,
         file_bytes=_read_file_bytes_with_limit(asset=asset, max_file_size_mb=max_file_size_mb),
     )
 

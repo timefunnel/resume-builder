@@ -44,7 +44,7 @@ class PgVectorStoreAdapter:
         normalized_embeddings = [self._normalize_embedding(item) for item in embeddings]
         return self._insert_documents(normalized_documents, normalized_embeddings)
 
-    def similarity_search(self, query: str, top_k: int) -> list[dict[str, Any]]:
+    def similarity_search(self, query: str, top_k: int, user_id: int) -> list[dict[str, Any]]:
         safe_query = (query or "").strip()
         if not safe_query:
             return []
@@ -69,8 +69,9 @@ class PgVectorStoreAdapter:
             "    1 - (embedding <=> %s::vector) AS similarity",
             f"FROM {_TABLE_NAME}",
             "WHERE embedding_dimensions = %s",
+            "  AND user_id = %s",
         ]
-        params: list[Any] = [query_vector, query_dimensions]
+        params: list[Any] = [query_vector, query_dimensions, int(user_id)]
         if self.embedding_model_name:
             sql_lines.append("  AND embedding_model = %s")
             params.append(self.embedding_model_name)
@@ -150,6 +151,7 @@ class PgVectorStoreAdapter:
                     document["source_type"],
                     document["ingest_source"],
                     document["content"],
+                    int(document.get("user_id") or 0),
                     Jsonb(document["metadata"]),
                     self._to_vector_literal(embedding),
                     self.embedding_model_name,
@@ -166,12 +168,13 @@ class PgVectorStoreAdapter:
             source_type,
             ingest_source,
             content,
+            user_id,
             metadata,
             embedding,
             embedding_model,
             embedding_dimensions
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::vector, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::vector, %s, %s)
         """
         _log_pgvector(
             "开始写入 pgvector",
@@ -209,6 +212,7 @@ class PgVectorStoreAdapter:
             if not content:
                 continue
             source_id = str(raw.get("source_id") or raw.get("sourceId") or "").strip() or f"doc-{index + 1}"
+            user_id = self._to_int(raw.get("user_id") or raw.get("userId"), 0)
             metadata = raw.get("metadata")
             safe_metadata = metadata if isinstance(metadata, dict) else {}
             chunk_index = self._to_int(safe_metadata.get("chunkIndex"), index)
@@ -218,6 +222,7 @@ class PgVectorStoreAdapter:
             ingest_source = str(safe_metadata.get("ingestSource") or "text_document")
             normalized.append(
                 {
+                    "user_id": user_id,
                     "source_id": source_id,
                     "chunk_index": chunk_index,
                     "original_filename": original_filename,
@@ -232,6 +237,7 @@ class PgVectorStoreAdapter:
                         "sourceType": source_type,
                         "ingestSource": ingest_source,
                         "chunkIndex": chunk_index,
+                        "userId": user_id,
                     },
                 }
             )

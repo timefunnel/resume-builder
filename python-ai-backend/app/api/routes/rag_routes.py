@@ -2,9 +2,10 @@
 from typing import BinaryIO
 from uuid import uuid4
 
-from fastapi import APIRouter, File, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.concurrency import run_in_threadpool
 
+from app.api.deps.auth import get_current_user
 from app.api.mappers.rag_mapper import (
     rag_ingest_request_to_dto,
     rag_ingest_response_from_dto,
@@ -30,19 +31,19 @@ router = APIRouter(prefix="/api/ai", tags=["ai-rag"])
 
 
 @router.post("/rag/query", response_model=RagQueryResponse)
-def rag_query(request: RagQueryRequest) -> RagQueryResponse:
-    return rag_query_response_from_dto(run_rag_query_use_case(rag_query_request_to_dto(request)))
+def rag_query(request: RagQueryRequest, current_user=Depends(get_current_user)) -> RagQueryResponse:
+    return rag_query_response_from_dto(run_rag_query_use_case(rag_query_request_to_dto(request, user_id=current_user.id)))
 
 
 @router.post("/rag/documents", response_model=RagIngestResponse)
-def rag_ingest_documents(request: RagIngestRequest) -> RagIngestResponse:
+def rag_ingest_documents(request: RagIngestRequest, current_user=Depends(get_current_user)) -> RagIngestResponse:
     return rag_ingest_response_from_dto(
-        ingest_rag_documents_use_case(rag_ingest_request_to_dto(request))
+        ingest_rag_documents_use_case(rag_ingest_request_to_dto(request, user_id=current_user.id))
     )
 
 
 @router.post("/rag/upload", response_model=RagUploadResponse)
-async def rag_upload_assets(files: list[UploadFile] = File(...)) -> RagUploadResponse:
+async def rag_upload_assets(files: list[UploadFile] = File(...), current_user=Depends(get_current_user)) -> RagUploadResponse:
     trace_id = uuid4().hex[:8]
     _log_route(trace_id, "收到上传请求", file_count=len(files))
 
@@ -50,13 +51,13 @@ async def rag_upload_assets(files: list[UploadFile] = File(...)) -> RagUploadRes
     # 文件读取、OCR、Embedding、pgvector 写入都是阻塞链路，必须整体移出事件循环，
     # 否则一次上传就会卡住同进程内其他 FastAPI 请求。
     try:
-        return await run_in_threadpool(_handle_rag_upload_request, files, trace_id)
+        return await run_in_threadpool(_handle_rag_upload_request, files, trace_id, current_user.id)
     except Exception as exc:
         _log_route(trace_id, "上传请求异常", error=str(exc))
         raise
 
 
-def _handle_rag_upload_request(files: list[UploadFile], trace_id: str) -> RagUploadResponse:
+def _handle_rag_upload_request(files: list[UploadFile], trace_id: str, user_id: int) -> RagUploadResponse:
     # 同步上传流水线的职责：
     # 1) 只登记文件名、content-type 和可读取的 file handle，不在路由层预读整批字节。
     # 2) 让 application use case 逐文件执行限流读取、解析、OCR、切块、向量化和入库。
@@ -70,7 +71,7 @@ def _handle_rag_upload_request(files: list[UploadFile], trace_id: str) -> RagUpl
         assets.append((file_name, content_type, item.file))
 
     response_dto = upload_and_ingest_rag_assets_use_case(
-        rag_upload_assets_to_dto(assets),
+        rag_upload_assets_to_dto(assets, user_id=user_id),
         trace_id=trace_id,
     )
     _log_route(

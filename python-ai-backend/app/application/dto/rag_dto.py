@@ -1,4 +1,3 @@
-# author: jf
 from dataclasses import dataclass, field
 from typing import Any, BinaryIO
 
@@ -7,6 +6,7 @@ from typing import Any, BinaryIO
 @dataclass(slots=True)
 class RagQueryRequestDto:
     query: str
+    user_id: int = 0
     top_k: int | None = None
 
 
@@ -30,6 +30,7 @@ class RagQueryResponseDto:
 class RagDocumentInputDto:
     content: str
     source_id: str | None = None
+    user_id: int = 0
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -48,6 +49,7 @@ class RagIngestResponseDto:
 class RagUploadAssetDto:
     file_name: str
     content_type: str
+    user_id: int = 0
     file_bytes: bytes | None = None
     file_stream: BinaryIO | None = None
 

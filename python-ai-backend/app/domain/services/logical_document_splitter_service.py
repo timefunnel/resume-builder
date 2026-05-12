@@ -67,6 +67,7 @@ class LogicalDocumentSplitterService:
                     source_type=document.source_type,
                     ingest_source=document.ingest_source,
                     content=part.content,
+                    user_id=document.user_id,
                     metadata={
                         **document.metadata,
                         "parentSourceId": document.source_id,

@@ -44,6 +44,7 @@ class DocumentChunkingService:
                 RagChunk(
                     source_id=document.source_id,
                     content=chunk_text,
+                    user_id=document.user_id,
                     metadata={
                         **document.metadata,
                         "originalFilename": document.original_filename,

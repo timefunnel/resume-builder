@@ -7,7 +7,7 @@ def run_rag_query(request: RagQueryRequestDto) -> RagQueryResponseDto:
     settings = resolve_settings()
     retriever = build_rag_retriever(settings)
     top_k = request.top_k or settings.app_rag_top_k
-    answer, raw_sources = retriever.query(query=request.query.strip(), top_k=top_k)
+    answer, raw_sources = retriever.query(user_id=request.user_id, query=request.query.strip(), top_k=top_k)
     return RagQueryResponseDto(
         answer=answer,
         sources=[

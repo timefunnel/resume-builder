@@ -1,4 +1,3 @@
-# author: jf
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -13,6 +12,7 @@ class ExtractedDocument:
     source_type: str
     ingest_source: str
     content: str
+    user_id: int = 0
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
@@ -21,4 +21,5 @@ class ExtractedDocument:
 class RagChunk:
     source_id: str
     content: str
+    user_id: int = 0
     metadata: dict[str, Any] = field(default_factory=dict)

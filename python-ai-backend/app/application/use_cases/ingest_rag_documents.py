@@ -8,6 +8,7 @@ def ingest_rag_documents(request: RagIngestRequestDto) -> RagIngestResponseDto:
     inserted = retriever.ingest_documents(
         [
             {
+                "user_id": int(item.user_id or 0),
                 "source_id": (item.source_id or "").strip(),
                 "content": item.content.strip(),
                 "metadata": item.metadata or {},

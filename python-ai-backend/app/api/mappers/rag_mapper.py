@@ -21,9 +21,9 @@ from app.application.dto.rag_dto import (
 )
 
 
-def rag_query_request_to_dto(request: RagQueryRequest) -> RagQueryRequestDto:
+def rag_query_request_to_dto(request: RagQueryRequest, *, user_id: int = 0) -> RagQueryRequestDto:
     # API 层 camelCase / 校验模型 转成应用层 snake_case DTO。
-    return RagQueryRequestDto(query=request.query, top_k=request.topK)
+    return RagQueryRequestDto(user_id=user_id, query=request.query, top_k=request.topK)
 
 
 def rag_query_response_from_dto(response: RagQueryResponseDto) -> RagQueryResponse:
@@ -36,10 +36,11 @@ def rag_query_response_from_dto(response: RagQueryResponseDto) -> RagQueryRespon
     )
 
 
-def rag_ingest_request_to_dto(request: RagIngestRequest) -> RagIngestRequestDto:
+def rag_ingest_request_to_dto(request: RagIngestRequest, *, user_id: int = 0) -> RagIngestRequestDto:
     return RagIngestRequestDto(
         documents=[
             RagDocumentInputDto(
+                user_id=user_id,
                 source_id=document.sourceId,
                 content=document.content,
                 metadata=document.metadata,
@@ -53,10 +54,10 @@ def rag_ingest_response_from_dto(response: RagIngestResponseDto) -> RagIngestRes
     return RagIngestResponse(inserted=response.inserted)
 
 
-def rag_upload_assets_to_dto(files: list[tuple[str, str, BinaryIO]]) -> list[RagUploadAssetDto]:
+def rag_upload_assets_to_dto(files: list[tuple[str, str, BinaryIO]], *, user_id: int = 0) -> list[RagUploadAssetDto]:
     # Route 层只保留元数据和可读取的文件流，避免在进入 use case 前整批读满内存。
     return [
-        RagUploadAssetDto(file_name=file_name, content_type=content_type, file_stream=file_stream)
+        RagUploadAssetDto(user_id=user_id, file_name=file_name, content_type=content_type, file_stream=file_stream)
         for file_name, content_type, file_stream in files
     ]
 
