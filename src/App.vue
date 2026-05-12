@@ -83,6 +83,34 @@ function syncMenuFromLocation() {
   }
 }
 
+
+
+async function handleAuthSuccess() {
+  const user = authStore.user
+  if (!user) return
+  await postAuthBootstrap(user.id)
+}
+
+async function postAuthBootstrap(userId?: number | null) {
+  resumeStore.updateStorageKey(userId ?? null)
+  if (!userId) return
+  try {
+    await resumeStore.loadFromCloud().catch(() => undefined)
+    const list = await resumeStore.fetchResumeList().catch(() => [])
+    if (!Array.isArray(list) || list.length === 0) {
+      await resumeStore.createNewResume('我的第一份简历').catch(() => undefined)
+    }
+  } finally {
+    setActiveMenu('resume-editor')
+    if (typeof window !== 'undefined') {
+      const targetPath = resolvePrimaryMenuPath('resume-editor')
+      if (normalizePrimaryRoutePath(window.location.pathname) !== targetPath) {
+        window.history.replaceState({ primaryMenu: 'resume-editor' }, '', targetPath)
+      }
+    }
+  }
+}
+
 function handleSelectMenu(key: PrimaryMenuKey) {
   if (!authStore.isLoggedIn) return
   setActiveMenu(key)
@@ -95,9 +123,8 @@ function handleSelectMenu(key: PrimaryMenuKey) {
 
 onMounted(() => {
   authStore.fetchMe().then((user) => {
-    resumeStore.updateStorageKey(user?.id ?? null)
     if (user) {
-      resumeStore.loadFromCloud().catch(() => undefined)
+      void postAuthBootstrap(user.id)
     } else {
       resumeStore.updateStorageKey(null)
     }
@@ -128,7 +155,7 @@ onUnmounted(() => {
           <p>为保证简历、面试记录和知识库数据隔离，当前系统仅对已登录用户开放。</p>
         </div>
       </div>
-      <AccountSettingsPanel :theme-mode="themeMode" @set-theme="setThemeMode" />
+      <AccountSettingsPanel :theme-mode="themeMode" @set-theme="setThemeMode" @auth-success="handleAuthSuccess" />
     </div>
   </div>
 
@@ -152,7 +179,7 @@ onUnmounted(() => {
       </template>
       <AiInterviewerPanel v-else-if="activeMenu === 'ai-interviewer'" />
       <KnowledgeBasePanel v-else-if="activeMenu === 'knowledge-base'" />
-      <AccountSettingsPanel v-else :theme-mode="themeMode" @set-theme="setThemeMode" />
+      <AccountSettingsPanel v-else :theme-mode="themeMode" @set-theme="setThemeMode" @auth-success="handleAuthSuccess" />
     </div>
   </div>
 </template>

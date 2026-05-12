@@ -12,6 +12,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'set-theme', mode: ThemeMode): void
+  (e: 'auth-success'): void
 }>()
 
 const authStore = useAuthStore()
@@ -54,9 +55,11 @@ async function submitAuth() {
         nickname: form.nickname || undefined,
       })
       authSuccess.value = '注册并登录成功'
+      emit('auth-success')
     } else {
       await authStore.login({ email: form.email, password: form.password })
       authSuccess.value = '登录成功'
+      emit('auth-success')
     }
   } catch (error) {
     authError.value = error instanceof Error ? error.message : '操作失败'
@@ -113,7 +116,7 @@ async function handleLogout() {
           <div>
             <h2 id="auth-card-title">账户</h2>
             <p v-if="isLoggedIn">当前已登录：{{ currentUserLabel }}</p>
-            <p v-else>登录后可隔离面试记录与知识库数据</p>
+            <p v-else>请先注册或登录，登录后才能进入系统并隔离简历、面试与知识库数据</p>
           </div>
           <button v-if="isLoggedIn" class="ghost-button" type="button" :disabled="authStore.loading" @click="handleLogout">
             退出登录
