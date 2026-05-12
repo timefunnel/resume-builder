@@ -184,6 +184,16 @@ async function handleSave() {
 }
 
 
+async function handleSwitchResumeById(id: number) {
+  if (!Number.isFinite(id) || id <= 0) return
+  try {
+    await store.loadResumeById(id)
+    resumeTitleDraft.value = store.currentResumeTitle
+  } catch (error) {
+    console.warn('Failed to switch resume', error)
+  }
+}
+
 async function handleSwitchResume(event: Event) {
   const target = event.target as HTMLSelectElement
   const id = Number(target.value)
@@ -585,6 +595,41 @@ onUnmounted(() => {
       </div>
     </div>
 
+
+    <section v-if="authStore.isLoggedIn" class="resume-library-panel">
+      <div class="resume-library-header">
+        <div>
+          <h2 class="resume-library-title">我的简历</h2>
+          <p class="resume-library-subtitle">这里会显示你当前账号下的云端简历，可直接切换、创建和删除。</p>
+        </div>
+        <div class="resume-library-actions">
+          <button class="btn-import" type="button" @click="handleCreateResume">新建简历</button>
+          <button class="btn-save" type="button" :disabled="!hasCloudResume" @click="handleSave">保存当前简历</button>
+        </div>
+      </div>
+
+      <div v-if="store.resumeList.length === 0" class="resume-library-empty">
+        当前账号下还没有云端简历，点击“新建简历”开始。
+      </div>
+
+      <div v-else class="resume-library-list">
+        <button
+          v-for="item in store.resumeList"
+          :key="item.id"
+          type="button"
+          class="resume-library-item"
+          :class="{ active: store.cloudResumeId === item.id }"
+          @click="handleSwitchResumeById(item.id)"
+        >
+          <div class="resume-library-item-main">
+            <strong>{{ item.title }}</strong>
+            <span>{{ item.updatedAt || '暂无更新时间' }}</span>
+          </div>
+          <span v-if="store.cloudResumeId === item.id" class="resume-library-current">当前</span>
+        </button>
+      </div>
+    </section>
+
     <section class="info-editor">
       <div class="info-editor-header">
         <div class="editor-title-row">
@@ -699,6 +744,19 @@ onUnmounted(() => {
 <style scoped src="./EditorPanel.css"></style>
 <style scoped src="./EditorPanel.responsive.css"></style>
 <style scoped>
+.resume-library-panel { margin-bottom: 14px; padding: 16px; border: 1px solid #e7d8c8; border-radius: 18px; background: #fffaf5; }
+.resume-library-header { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom: 12px; }
+.resume-library-title { margin:0; font-size:18px; color:#2d2521; }
+.resume-library-subtitle { margin:4px 0 0; color:#7b6a5b; font-size:12px; line-height:1.6; }
+.resume-library-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.resume-library-empty { padding:12px 14px; border-radius:12px; background:#fff; color:#7b6a5b; font-size:12px; font-weight:700; }
+.resume-library-list { display:flex; flex-direction:column; gap:8px; }
+.resume-library-item { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; padding:12px 14px; border-radius:14px; border:1px solid #e7d8c8; background:#fff; text-align:left; }
+.resume-library-item.active { border-color:#2d2521; box-shadow:0 0 0 3px rgba(45,37,33,.08); background:#fffdf9; }
+.resume-library-item-main { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.resume-library-item-main strong { color:#2d2521; font-size:14px; }
+.resume-library-item-main span { color:#8a7461; font-size:11px; }
+.resume-library-current { flex-shrink:0; padding:4px 10px; border-radius:999px; background:#2d2521; color:#fff; font-size:11px; font-weight:800; }
 .ai-import-feedback { margin:14px 0 0; padding:10px 12px; border-radius:12px; font-size:12px; font-weight:700; }
 .ai-import-feedback.processing { background:#fff8f1; color:#7b6a5b; border:1px solid #ead9c6; }
 .ai-import-feedback.error { background:#fff1f1; color:#b42318; border:1px solid #f1c7c7; }
