@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { getCurrentResume, putCurrentResume } from '@/api/resumeApi'
 import { reactive, ref, watch } from 'vue'
+import { getCurrentResume, putCurrentResume } from '@/api/resumeApi'
 import { normalizeResumeTemplateKey, type ResumeTemplateKey } from '@/templates/resume'
 // author: jf
 
@@ -103,70 +103,14 @@ export const useResumeStore = defineStore('resume', () => {
   ])
 
   const basicInfo = reactive<BasicInfo>({
-    name: '',
-    phone: '',
-    email: '',
-    age: '',
-    gender: '',
-    location: '',
-    jobTitle: '',
-    educationLevel: '',
-    avatar: '',
-    workYears: '',
-    currentStatus: '',
-    expectedLocation: '',
-    expectedSalary: '',
-    website: '',
-    wechat: '',
-    currentCity: '',
-    github: '',
-    blog: '',
+    name: '', phone: '', email: '', age: '', gender: '', location: '', jobTitle: '', educationLevel: '', avatar: '',
+    workYears: '', currentStatus: '', expectedLocation: '', expectedSalary: '', website: '', wechat: '', currentCity: '', github: '', blog: '',
   })
 
-  const educationList = reactive<EducationEntry[]>([
-    {
-      id: genId(),
-      school: '',
-      college: '',
-      major: '',
-      degree: '',
-      startDate: '',
-      endDate: '',
-      gpa: '',
-      description: '',
-      type: '',
-      location: '',
-    },
-  ])
-
+  const educationList = reactive<EducationEntry[]>([{ id: genId(), school: '', college: '', major: '', degree: '', startDate: '', endDate: '', gpa: '', description: '', type: '', location: '' }])
   const skills = ref('')
-
-  const workList = reactive<WorkEntry[]>([
-    {
-      id: genId(),
-      company: '',
-      department: '',
-      position: '',
-      startDate: '',
-      endDate: '',
-      location: '',
-      description: '',
-    },
-  ])
-
-  const projectList = reactive<ProjectEntry[]>([
-    {
-      id: genId(),
-      name: '',
-      role: '',
-      startDate: '',
-      endDate: '',
-      link: '',
-      introduction: '',
-      mainWork: '',
-    },
-  ])
-
+  const workList = reactive<WorkEntry[]>([{ id: genId(), company: '', department: '', position: '', startDate: '', endDate: '', location: '', description: '' }])
+  const projectList = reactive<ProjectEntry[]>([{ id: genId(), name: '', role: '', startDate: '', endDate: '', link: '', introduction: '', mainWork: '' }])
   const awardList = reactive<AwardEntry[]>([])
   const selfIntro = ref('')
   const selectedTemplateKey = ref<ResumeTemplateKey>('default')
@@ -174,176 +118,22 @@ export const useResumeStore = defineStore('resume', () => {
   const lastSavedAt = ref<number | null>(null)
   const lastSaveMode = ref<'auto' | 'manual' | null>(null)
   const isSaving = ref(false)
-
-  function toggleModule(key: string) {
-    const mod = modules.find((m) => m.key === key)
-    if (mod) mod.visible = !mod.visible
-  }
-
-  function setTemplate(key: ResumeTemplateKey) {
-    selectedTemplateKey.value = key
-  }
-
-  function canMoveModule(key: string, direction: MoveDirection): boolean {
-    if (key === 'basicInfo') return false
-    const idx = modules.findIndex((m) => m.key === key)
-    if (idx < 0) return false
-    const mod = modules[idx]
-    if (!mod?.visible) return false
-    if (direction === 'up') return idx > 1
-    return idx < modules.length - 1
-  }
-
-  function moveModule(key: string, direction: MoveDirection) {
-    if (!canMoveModule(key, direction)) return
-    const idx = modules.findIndex((m) => m.key === key)
-    if (idx < 0) return
-    const target = direction === 'up' ? idx - 1 : idx + 1
-    const current = modules[idx]
-    const next = modules[target]
-    if (!current || !next) return
-    modules[idx] = next
-    modules[target] = current
-  }
-
-  function reorderModule(sourceKey: string, targetKey: string) {
-    if (sourceKey === targetKey || sourceKey === 'basicInfo') return
-    const sourceIndex = modules.findIndex((m) => m.key === sourceKey)
-    const targetIndex = modules.findIndex((m) => m.key === targetKey)
-    if (sourceIndex < 0 || targetIndex < 0) return
-
-    const [sourceModule] = modules.splice(sourceIndex, 1)
-    if (!sourceModule) return
-
-    let nextIndex = targetKey === 'basicInfo' ? 1 : targetIndex
-    if (sourceIndex < targetIndex) {
-      nextIndex -= 1
-    }
-    nextIndex = Math.max(1, Math.min(nextIndex, modules.length))
-
-    modules.splice(nextIndex, 0, sourceModule)
-  }
-
-  function isDefaultModuleOrder(): boolean {
-    return modules.every((m, idx) => m.key === DEFAULT_MODULE_ORDER[idx])
-  }
-
-  function resetModuleOrder() {
-    const indexMap = new Map<string, number>()
-    DEFAULT_MODULE_ORDER.forEach((key, idx) => indexMap.set(key, idx))
-    const sorted = [...modules].sort((a, b) => {
-      const ai = indexMap.get(a.key)
-      const bi = indexMap.get(b.key)
-      if (ai === undefined && bi === undefined) return 0
-      if (ai === undefined) return 1
-      if (bi === undefined) return -1
-      return ai - bi
-    })
-    modules.splice(0, modules.length, ...sorted)
-  }
-
-  function isModuleVisible(key: string): boolean {
-    const mod = modules.find((m) => m.key === key)
-    return mod ? mod.visible : false
-  }
-
-  function addEducation() {
-    educationList.push({
-      id: genId(),
-      school: '',
-      college: '',
-      major: '',
-      degree: '',
-      startDate: '',
-      endDate: '',
-      gpa: '',
-      description: '',
-      type: '',
-      location: '',
-    })
-  }
-
-  function removeEducation(id: string) {
-    const idx = educationList.findIndex((e) => e.id === id)
-    if (idx > -1) educationList.splice(idx, 1)
-  }
-
-  function addWork() {
-    workList.push({
-      id: genId(),
-      company: '',
-      department: '',
-      position: '',
-      startDate: '',
-      endDate: '',
-      location: '',
-      description: '',
-    })
-  }
-
-  function removeWork(id: string) {
-    const idx = workList.findIndex((e) => e.id === id)
-    if (idx > -1) workList.splice(idx, 1)
-  }
-
-  function addProject() {
-    projectList.push({
-      id: genId(),
-      name: '',
-      role: '',
-      startDate: '',
-      endDate: '',
-      link: '',
-      introduction: '',
-      mainWork: '',
-    })
-  }
-
-  function removeProject(id: string) {
-    const idx = projectList.findIndex((e) => e.id === id)
-    if (idx > -1) projectList.splice(idx, 1)
-  }
-
-  function canMoveProject(id: string, direction: MoveDirection): boolean {
-    const idx = projectList.findIndex((e) => e.id === id)
-    if (idx < 0) return false
-    if (direction === 'up') return idx > 0
-    return idx < projectList.length - 1
-  }
-
-  function moveProject(id: string, direction: MoveDirection) {
-    if (!canMoveProject(id, direction)) return
-    const idx = projectList.findIndex((e) => e.id === id)
-    if (idx < 0) return
-    const target = direction === 'up' ? idx - 1 : idx + 1
-    const current = projectList[idx]
-    const next = projectList[target]
-    if (!current || !next) return
-    projectList[idx] = next
-    projectList[target] = current
-  }
-
-  function addAward() {
-    awardList.push({
-      id: genId(),
-      name: '',
-      date: '',
-      description: '',
-    })
-  }
-
-  function removeAward(id: string) {
-    const idx = awardList.findIndex((e) => e.id === id)
-    if (idx > -1) awardList.splice(idx, 1)
-  }
-
-  const STORAGE_KEY = 'resume-builder-data'
   const cloudResumeId = ref<number | null>(null)
   const cloudUpdatedAt = ref<string | null>(null)
+
+  const STORAGE_KEY_BASE = 'resume-builder-data'
   const AUTO_SAVE_DELAY_MS = 500
   const SAVE_LOADING_MIN_MS = 900
+  const CLOUD_SAVE_DELAY_MS = 1200
 
   let saveLoadingTimer: ReturnType<typeof setTimeout> | null = null
+  let saveTimer: ReturnType<typeof setTimeout> | null = null
+  let cloudSaveTimer: ReturnType<typeof setTimeout> | null = null
+  let activeStorageKey = STORAGE_KEY_BASE
+
+  function updateStorageKey(userId?: number | null) {
+    activeStorageKey = userId ? `${STORAGE_KEY_BASE}:user:${userId}` : STORAGE_KEY_BASE
+  }
 
   function markSavingState() {
     isSaving.value = true
@@ -368,18 +158,39 @@ export const useResumeStore = defineStore('resume', () => {
     }
   }
 
+  function applyResumeData(data: any) {
+    if (!data || typeof data !== 'object') return
+    if (data.modules) {
+      const byKey = new Map<string, ModuleConfig>()
+      ;(data.modules as ModuleConfig[]).forEach((m) => { if (m?.key) byKey.set(m.key, m) })
+      const orderedKeys = ['basicInfo', ...(data.modules as ModuleConfig[]).map((m) => m.key).filter((key) => key && key !== 'basicInfo')]
+      const seen = new Set<string>()
+      const nextModules: ModuleConfig[] = []
+      orderedKeys.forEach((key) => {
+        if (seen.has(key)) return
+        seen.add(key)
+        const fallback = modules.find((m) => m.key === key)
+        if (!fallback) return
+        nextModules.push({ ...fallback, ...byKey.get(key) })
+      })
+      modules.forEach((m) => {
+        if (seen.has(m.key)) return
+        nextModules.push({ ...m, ...byKey.get(m.key) })
+      })
+      modules.splice(0, modules.length, ...nextModules)
+    }
+    selectedTemplateKey.value = normalizeResumeTemplateKey(data.selectedTemplateKey ?? data.selectedTemplateId)
+    if (data.basicInfo) Object.assign(basicInfo, data.basicInfo)
+    if (data.educationList) educationList.splice(0, educationList.length, ...data.educationList)
+    if (data.skills !== undefined) skills.value = data.skills
+    if (data.workList) workList.splice(0, workList.length, ...data.workList)
+    if (data.projectList) projectList.splice(0, projectList.length, ...data.projectList)
+    if (data.awardList) awardList.splice(0, awardList.length, ...data.awardList)
+    if (data.selfIntro !== undefined) selfIntro.value = data.selfIntro
+  }
+
   function exportResumeData(): string {
-    return JSON.stringify({
-      modules: modules.map((m) => ({ ...m })),
-      selectedTemplateKey: selectedTemplateKey.value,
-      basicInfo: { ...basicInfo },
-      educationList: educationList.map((e) => ({ ...e })),
-      skills: skills.value,
-      workList: workList.map((w) => ({ ...w })),
-      projectList: projectList.map((p) => ({ ...p })),
-      awardList: awardList.map((a) => ({ ...a })),
-      selfIntro: selfIntro.value,
-    }, null, 2)
+    return JSON.stringify(snapshotResumeData(), null, 2)
   }
 
   function saveToStorage(mode: 'auto' | 'manual' = 'manual') {
@@ -388,105 +199,28 @@ export const useResumeStore = defineStore('resume', () => {
       saveTimer = null
     }
     markSavingState()
-    const data = snapshotResumeData()
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    localStorage.setItem(activeStorageKey, JSON.stringify(snapshotResumeData()))
     nextAutoSaveAt.value = null
     lastSavedAt.value = Date.now()
     lastSaveMode.value = mode
   }
 
-  function importResumeData(raw: string) {
-    JSON.parse(raw)
-    localStorage.setItem(STORAGE_KEY, raw)
-    loadFromStorage()
-
-  async function saveToCloud(title = '我的简历') {
-    markSavingState()
-    const response = await putCurrentResume({ title, content: snapshotResumeData() })
-    if (!response.ok) {
-      const text = await response.text().catch(() => '')
-      throw new Error(text || `云端保存失败 (${response.status})`)
-    }
-    const payload = await response.json().catch(() => null)
-    cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null
-    cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null
-    lastSavedAt.value = Date.now()
-    lastSaveMode.value = 'manual'
-    return payload
-  }
-
-  async function loadFromCloud() {
-    const response = await getCurrentResume()
-    if (!response.ok) {
-      throw new Error(`云端加载失败 (${response.status})`)
-    }
-    const payload = await response.json().catch(() => null)
-    cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null
-    cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null
-    if (payload?.content && typeof payload.content === 'object' && Object.keys(payload.content).length > 0) {
-      importResumeData(JSON.stringify(payload.content))
-    }
-    return payload
-  }
-    saveToStorage('manual')
-  }
-
   function loadFromStorage() {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(activeStorageKey)
     if (!raw) return
     try {
-      const data = JSON.parse(raw)
-      if (data.modules) {
-        const byKey = new Map<string, ModuleConfig>()
-        ;(data.modules as ModuleConfig[]).forEach((m) => {
-          if (m?.key) byKey.set(m.key, m)
-        })
-
-        const orderedKeys = [
-          'basicInfo',
-          ...(data.modules as ModuleConfig[]).map((m) => m.key).filter((key) => key && key !== 'basicInfo'),
-        ]
-
-        const seen = new Set<string>()
-        const nextModules: ModuleConfig[] = []
-
-        orderedKeys.forEach((key) => {
-          if (seen.has(key)) return
-          seen.add(key)
-          const fallback = modules.find((m) => m.key === key)
-          if (!fallback) return
-          nextModules.push({ ...fallback, ...byKey.get(key) })
-        })
-
-        modules.forEach((m) => {
-          if (seen.has(m.key)) return
-          nextModules.push({ ...m, ...byKey.get(m.key) })
-        })
-
-        modules.splice(0, modules.length, ...nextModules)
-      }
-      selectedTemplateKey.value = normalizeResumeTemplateKey(data.selectedTemplateKey ?? data.selectedTemplateId)
-      if (data.basicInfo) Object.assign(basicInfo, data.basicInfo)
-      if (data.educationList) {
-        educationList.splice(0, educationList.length, ...data.educationList)
-      }
-      if (data.skills !== undefined) skills.value = data.skills
-      if (data.workList) {
-        workList.splice(0, workList.length, ...data.workList)
-      }
-      if (data.projectList) {
-        projectList.splice(0, projectList.length, ...data.projectList)
-      }
-      if (data.awardList) {
-        awardList.splice(0, awardList.length, ...data.awardList)
-      }
-      if (data.selfIntro !== undefined) selfIntro.value = data.selfIntro
+      applyResumeData(JSON.parse(raw))
     } catch (e) {
       console.warn('Failed to load resume data from localStorage', e)
     }
   }
 
-  loadFromStorage()
+  function importResumeData(raw: string) {
+    const data = JSON.parse(raw)
+    localStorage.setItem(activeStorageKey, JSON.stringify(data))
+    applyResumeData(data)
+    saveToStorage('manual')
+  }
 
   async function saveToCloud(title = '我的简历') {
     markSavingState()
@@ -503,21 +237,92 @@ export const useResumeStore = defineStore('resume', () => {
     return payload
   }
 
+  function scheduleCloudSave(title = '我的简历') {
+    if (cloudSaveTimer) clearTimeout(cloudSaveTimer)
+    cloudSaveTimer = setTimeout(() => {
+      cloudSaveTimer = null
+      saveToCloud(title).catch((error) => {
+        console.warn('Failed to autosave resume to cloud', error)
+      })
+    }, CLOUD_SAVE_DELAY_MS)
+  }
+
   async function loadFromCloud() {
     const response = await getCurrentResume()
-    if (!response.ok) {
-      throw new Error(`云端加载失败 (${response.status})`)
-    }
+    if (!response.ok) throw new Error(`云端加载失败 (${response.status})`)
     const payload = await response.json().catch(() => null)
     cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null
     cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null
     if (payload?.content && typeof payload.content === 'object' && Object.keys(payload.content).length > 0) {
-      importResumeData(JSON.stringify(payload.content))
+      localStorage.setItem(activeStorageKey, JSON.stringify(payload.content))
+      applyResumeData(payload.content)
     }
     return payload
   }
 
-  let saveTimer: ReturnType<typeof setTimeout> | null = null
+  function toggleModule(key: string) { const mod = modules.find((m) => m.key === key); if (mod) mod.visible = !mod.visible }
+  function setTemplate(key: ResumeTemplateKey) { selectedTemplateKey.value = key }
+  function canMoveModule(key: string, direction: MoveDirection): boolean {
+    if (key === 'basicInfo') return false
+    const idx = modules.findIndex((m) => m.key === key)
+    if (idx < 0) return false
+    const mod = modules[idx]
+    if (!mod?.visible) return false
+    return direction === 'up' ? idx > 1 : idx < modules.length - 1
+  }
+  function moveModule(key: string, direction: MoveDirection) {
+    if (!canMoveModule(key, direction)) return
+    const idx = modules.findIndex((m) => m.key === key)
+    const target = direction === 'up' ? idx - 1 : idx + 1
+    const current = modules[idx]
+    const next = modules[target]
+    if (!current || !next) return
+    modules[idx] = next
+    modules[target] = current
+  }
+  function reorderModule(sourceKey: string, targetKey: string) {
+    if (sourceKey === targetKey || sourceKey === 'basicInfo') return
+    const sourceIndex = modules.findIndex((m) => m.key === sourceKey)
+    const targetIndex = modules.findIndex((m) => m.key === targetKey)
+    if (sourceIndex < 0 || targetIndex < 0) return
+    const [sourceModule] = modules.splice(sourceIndex, 1)
+    if (!sourceModule) return
+    let nextIndex = targetKey === 'basicInfo' ? 1 : targetIndex
+    if (sourceIndex < targetIndex) nextIndex -= 1
+    nextIndex = Math.max(1, Math.min(nextIndex, modules.length))
+    modules.splice(nextIndex, 0, sourceModule)
+  }
+  function isDefaultModuleOrder(): boolean { return modules.every((m, idx) => m.key === DEFAULT_MODULE_ORDER[idx]) }
+  function resetModuleOrder() {
+    const indexMap = new Map<string, number>()
+    DEFAULT_MODULE_ORDER.forEach((key, idx) => indexMap.set(key, idx))
+    const sorted = [...modules].sort((a, b) => (indexMap.get(a.key) ?? 999) - (indexMap.get(b.key) ?? 999))
+    modules.splice(0, modules.length, ...sorted)
+  }
+  function isModuleVisible(key: string): boolean { return !!modules.find((m) => m.key === key)?.visible }
+  function addEducation() { educationList.push({ id: genId(), school: '', college: '', major: '', degree: '', startDate: '', endDate: '', gpa: '', description: '', type: '', location: '' }) }
+  function removeEducation(id: string) { const idx = educationList.findIndex((e) => e.id === id); if (idx > -1) educationList.splice(idx, 1) }
+  function addWork() { workList.push({ id: genId(), company: '', department: '', position: '', startDate: '', endDate: '', location: '', description: '' }) }
+  function removeWork(id: string) { const idx = workList.findIndex((e) => e.id === id); if (idx > -1) workList.splice(idx, 1) }
+  function addProject() { projectList.push({ id: genId(), name: '', role: '', startDate: '', endDate: '', link: '', introduction: '', mainWork: '' }) }
+  function removeProject(id: string) { const idx = projectList.findIndex((e) => e.id === id); if (idx > -1) projectList.splice(idx, 1) }
+  function canMoveProject(id: string, direction: MoveDirection): boolean { const idx = projectList.findIndex((e) => e.id === id); return idx >= 0 && (direction === 'up' ? idx > 0 : idx < projectList.length - 1) }
+  function moveProject(id: string, direction: MoveDirection) {
+    if (!canMoveProject(id, direction)) return
+    const idx = projectList.findIndex((e) => e.id === id)
+    const target = direction === 'up' ? idx - 1 : idx + 1
+    const current = projectList[idx]
+    const next = projectList[target]
+    if (!current || !next) return
+    projectList[idx] = next
+    projectList[target] = current
+  }
+  function addAward() { awardList.push({ id: genId(), name: '', date: '', description: '' }) }
+  function removeAward(id: string) { const idx = awardList.findIndex((e) => e.id === id); if (idx > -1) awardList.splice(idx, 1) }
+
+  updateStorageKey(null)
+  loadFromStorage()
+
   watch(
     [
       () => JSON.stringify(basicInfo),
@@ -574,7 +379,9 @@ export const useResumeStore = defineStore('resume', () => {
     importResumeData,
     saveToStorage,
     saveToCloud,
+    scheduleCloudSave,
     loadFromCloud,
+    updateStorageKey,
     autoSaveDelayMs: AUTO_SAVE_DELAY_MS,
     nextAutoSaveAt,
     lastSavedAt,

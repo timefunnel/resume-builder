@@ -104,8 +104,11 @@ function handleSelectMenu(key: PrimaryMenuKey) {
 
 onMounted(() => {
   authStore.fetchMe().then((user) => {
+    resumeStore.updateStorageKey(user?.id ?? null)
     if (user) {
       resumeStore.loadFromCloud().catch(() => undefined)
+    } else {
+      resumeStore.updateStorageKey(null)
     }
   }).catch(() => undefined)
   syncMenuFromLocation()

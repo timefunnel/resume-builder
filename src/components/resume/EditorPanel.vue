@@ -1,6 +1,6 @@
 ﻿<script setup lang="ts">
 // author: jf
-import { computed, onMounted, onUnmounted, reactive, ref, type Component } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch, type Component } from 'vue'
 import { useResumeStore } from '@/stores/resume'
 import { useAuthStore } from '@/stores/auth'
 import BasicInfoEditor from './editors/BasicInfoEditor.vue'
@@ -264,6 +264,28 @@ onMounted(() => {
   }, 200)
   document.addEventListener('mousedown', handleDocumentPointerDown)
 })
+
+
+watch(
+  () => [
+    JSON.stringify(store.basicInfo),
+    JSON.stringify(store.educationList),
+    store.skills,
+    JSON.stringify(store.workList),
+    JSON.stringify(store.projectList),
+    JSON.stringify(store.awardList),
+    store.selfIntro,
+    store.selectedTemplateKey,
+    JSON.stringify(store.modules),
+    authStore.isLoggedIn,
+  ],
+  () => {
+    if (authStore.isLoggedIn) {
+      store.scheduleCloudSave('我的简历')
+    }
+  },
+  { deep: false }
+)
 
 onUnmounted(() => {
   if (autoSaveTicker) {
