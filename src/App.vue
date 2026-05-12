@@ -1,6 +1,7 @@
 <!-- author: jf -->
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import KnowledgeBasePanel from '@/components/ai/knowledge/KnowledgeBasePanel.vue'
 import AiInterviewerPanel from '@/components/ai/interview/AiInterviewerPanel.vue'
 import ModuleSidebar from '@/components/common/ModuleSidebar.vue'
@@ -16,6 +17,7 @@ import {
   type PrimaryMenuKey,
 } from '@/router/menuRoutes'
 
+const authStore = useAuthStore()
 const sidebarCollapsed = ref(false)
 type ResumeMobilePane = 'editor' | 'preview'
 const activeMenu = ref<PrimaryMenuKey>(
@@ -99,6 +101,7 @@ function handleSelectMenu(key: PrimaryMenuKey) {
 }
 
 onMounted(() => {
+  authStore.fetchMe().catch(() => undefined)
   syncMenuFromLocation()
   window.addEventListener('popstate', syncMenuFromLocation)
 })

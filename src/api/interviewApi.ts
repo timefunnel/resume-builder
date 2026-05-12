@@ -27,6 +27,7 @@ export async function postInterviewTurnStream(
     },
     body: JSON.stringify(requestBody),
     signal,
+    credentials: 'include',
   })
 }
 
@@ -37,6 +38,7 @@ export async function getInterviewSessions(limit = 20, signal?: AbortSignal): Pr
       Accept: 'application/json',
     },
     signal,
+    credentials: 'include',
   })
 }
 
@@ -47,5 +49,6 @@ export async function getInterviewSessionDetail(sessionId: string, signal?: Abor
       Accept: 'application/json',
     },
     signal,
+    credentials: 'include',
   })
 }

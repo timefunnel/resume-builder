@@ -33,6 +33,7 @@ export async function postRealtimeClientSecret(
     },
     body: JSON.stringify(payload),
     signal,
+    credentials: 'include',
   })
 }
 
@@ -50,5 +51,6 @@ export async function postRealtimeCallSdp(
     },
     body: sdpOffer,
     signal,
+    credentials: 'include',
   })
 }

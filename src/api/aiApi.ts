@@ -30,6 +30,7 @@ export async function postAiChat(
     },
     body: JSON.stringify(requestBody),
     signal,
+    credentials: 'include',
   })
 }
 
@@ -45,5 +46,6 @@ export async function postAiChatStream(
     },
     body: JSON.stringify(requestBody),
     signal,
+    credentials: 'include',
   })
 }
