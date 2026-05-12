@@ -11,6 +11,7 @@ import ProjectExperienceEditor from './editors/ProjectExperienceEditor.vue'
 import AwardsEditor from './editors/AwardsEditor.vue'
 import SelfIntroEditor from './editors/SelfIntroEditor.vue'
 import AiOptimizePanel from '@/components/ai/AiOptimizePanel.vue'
+import { importResumeWithAi } from '@/api/resumeImportApi'
 import { getModuleIconPaths, MODULE_ICON_VIEWBOX } from '@/constants/moduleIcons'
 
 const store = useResumeStore()
@@ -27,6 +28,8 @@ const nowTick = ref(Date.now())
 const resumeTitleDraft = ref('')
 const resumeTitleInputRef = ref<HTMLInputElement | null>(null)
 const titleDirty = ref(false)
+const aiImportInputRef = ref<HTMLInputElement | null>(null)
+const aiImporting = ref(false)
 
 function handleAiClick() {
   showAiPanel.value = true
@@ -192,6 +195,37 @@ async function handleDeleteResume() {
     titleDirty.value = false
   } catch (error) {
     console.warn('Failed to delete resume', error)
+  }
+}
+
+
+function triggerAiImport() {
+  if (aiImporting.value) return
+  aiImportInputRef.value?.click()
+}
+
+async function handleAiImport(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  input.value = ''
+  aiImporting.value = true
+  try {
+    const response = await importResumeWithAi(file)
+    const payload = await response.json().catch(() => null)
+    if (!response.ok) {
+      throw new Error(String(payload?.detail || `AI 导入失败 (${response.status})`))
+    }
+    if (payload?.content) {
+      store.importResumeData(JSON.stringify(payload.content))
+      if (typeof payload.title === 'string' && payload.title.trim()) {
+        resumeTitleDraft.value = payload.title.trim()
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to import resume with AI', error)
+  } finally {
+    aiImporting.value = false
   }
 }
 
@@ -512,11 +546,13 @@ onUnmounted(() => {
           </span>
         </div>
         <div class="editor-header-actions">
+          <button class="btn-import" type="button" :disabled="aiImporting" @click="triggerAiImport">{{ aiImporting ? 'AI 导入中…' : 'AI 导入简历' }}</button>
           <button class="btn-import" type="button" @click="triggerJsonImport">导入 JSON</button>
           <button class="btn-save" @click="handleSave">保存草稿</button>
         </div>
       </div>
       <p class="editor-subtitle">模块顺序与模块开关一致，点击右侧可展开/收起</p>
+      <input ref="aiImportInputRef" type="file" accept=".pdf,.txt,.md,.docx,.png,.jpg,.jpeg,.webp" style="display: none" @change="handleAiImport" />
       <input
         ref="jsonImportInputRef"
         type="file"

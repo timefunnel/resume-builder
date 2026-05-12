@@ -2,6 +2,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app.domain.exceptions.resume_import_exceptions import ResumeImportError
 from app.domain.exceptions.rag_exceptions import (
     EmbeddingError,
     FileParseError,
@@ -39,3 +40,7 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(VectorStoreError)
     async def handle_vector_store_error(_: Request, exc: VectorStoreError) -> JSONResponse:
         return JSONResponse(status_code=500, content={"detail": str(exc)})
+
+    @app.exception_handler(ResumeImportError)
+    async def handle_resume_import_error(_: Request, exc: ResumeImportError) -> JSONResponse:
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
