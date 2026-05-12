@@ -30,6 +30,7 @@ const resumeTitleInputRef = ref<HTMLInputElement | null>(null)
 const titleDirty = ref(false)
 const aiImportInputRef = ref<HTMLInputElement | null>(null)
 const aiImporting = ref(false)
+const newResumeNameDraft = ref('')
 const aiImportStageText = ref('')
 const aiImportError = ref('')
 const aiImportSuccess = ref('')
@@ -207,10 +208,12 @@ async function handleSwitchResume(event: Event) {
 }
 
 async function handleCreateResume() {
+  const requestedTitle = (newResumeNameDraft.value || '').trim() || '新的简历'
   try {
-    const created = await store.createNewResume('新的简历')
+    const created = await store.createNewResume(requestedTitle)
     resumeTitleDraft.value = created?.title || '新的简历'
     titleDirty.value = false
+    newResumeNameDraft.value = ''
     requestAnimationFrame(() => resumeTitleInputRef.value?.focus())
   } catch (error) {
     console.warn('Failed to create resume', error)
@@ -618,7 +621,8 @@ onUnmounted(() => {
           :key="item.id"
           type="button"
           class="resume-library-item"
-          :class="{ active: store.cloudResumeId === item.id }"
+          :class="{ active: store.cloudResumeId === item.id, disabled: store.operationState !== 'idle' }"
+          :disabled="store.operationState !== 'idle'"
           @click="handleSwitchResumeById(item.id)"
         >
           <div class="resume-library-item-main">
@@ -749,10 +753,12 @@ onUnmounted(() => {
 .resume-library-title { margin:0; font-size:18px; color:#2d2521; }
 .resume-library-subtitle { margin:4px 0 0; color:#7b6a5b; font-size:12px; line-height:1.6; }
 .resume-library-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.resume-new-input { height:36px; min-width:160px; border-radius:12px; border:1px solid #dfd2c2; background:#fff; padding:0 12px; font-size:12px; font-weight:700; color:#2d2521; }
 .resume-library-empty { padding:12px 14px; border-radius:12px; background:#fff; color:#7b6a5b; font-size:12px; font-weight:700; }
 .resume-library-list { display:flex; flex-direction:column; gap:8px; }
 .resume-library-item { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; padding:12px 14px; border-radius:14px; border:1px solid #e7d8c8; background:#fff; text-align:left; }
 .resume-library-item.active { border-color:#2d2521; box-shadow:0 0 0 3px rgba(45,37,33,.08); background:#fffdf9; }
+.resume-library-item.disabled { opacity:.65; cursor:not-allowed; }
 .resume-library-item-main { display:flex; flex-direction:column; gap:4px; min-width:0; }
 .resume-library-item-main strong { color:#2d2521; font-size:14px; }
 .resume-library-item-main span { color:#8a7461; font-size:11px; }

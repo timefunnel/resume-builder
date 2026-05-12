@@ -50,6 +50,8 @@ export const useResumeStore = defineStore('resume', () => {
   const cloudUpdatedAt = ref<string | null>(null)
   const resumeList = ref<ResumeSummaryPayload[]>([])
   const currentResumeTitle = ref('我的简历')
+  const currentResumeLoaded = ref(false)
+  const operationState = ref<'idle' | 'loading' | 'creating' | 'switching' | 'deleting' | 'saving'>('idle')
 
   const STORAGE_KEY_BASE = 'resume-builder-data'
   const AUTO_SAVE_DELAY_MS = 500
@@ -109,22 +111,28 @@ export const useResumeStore = defineStore('resume', () => {
   function importResumeData(raw: string) { const data = JSON.parse(raw); localStorage.setItem(activeStorageKey, JSON.stringify(data)); applyResumeData(data); saveToStorage('manual') }
   async function fetchResumeList() { const response = await listResumes(); if (!response.ok) throw new Error(`简历列表加载失败 (${response.status})`); resumeList.value = await response.json().catch(() => []); return resumeList.value }
   async function saveToCloud(title = currentResumeTitle.value || '我的简历') {
+    if (operationState.value in {loading:1, creating:1, switching:1, deleting:1}) return null as any
+    operationState.value = 'saving'
     markSavingState()
-    const payload = { title, content: snapshotResumeData() }
-    const response = cloudResumeId.value ? await updateResumeById(cloudResumeId.value, payload) : await putCurrentResume(payload)
-    if (!response.ok) { const text = await response.text().catch(() => ''); throw new Error(text || `云端保存失败 (${response.status})`) }
-    const result = await response.json().catch(() => null)
-    cloudResumeId.value = typeof result?.id === 'number' ? result.id : null
-    cloudUpdatedAt.value = typeof result?.updatedAt === 'string' ? result.updatedAt : null
-    currentResumeTitle.value = typeof result?.title === 'string' ? result.title : title
-    await fetchResumeList().catch(() => undefined)
-    lastSavedAt.value = Date.now(); lastSaveMode.value = 'manual'; return result
+    try {
+      const payload = { title, content: snapshotResumeData() }
+      const response = cloudResumeId.value ? await updateResumeById(cloudResumeId.value, payload) : await putCurrentResume(payload)
+      if (!response.ok) { const text = await response.text().catch(() => ''); throw new Error(text || `云端保存失败 (${response.status})`) }
+      const result = await response.json().catch(() => null)
+      cloudResumeId.value = typeof result?.id === 'number' ? result.id : null
+      cloudUpdatedAt.value = typeof result?.updatedAt === 'string' ? result.updatedAt : null
+      currentResumeTitle.value = typeof result?.title === 'string' ? result.title : title
+      await fetchResumeList().catch(() => undefined)
+      lastSavedAt.value = Date.now(); lastSaveMode.value = 'manual'; return result
+    } finally {
+      operationState.value = 'idle'
+    }
   }
-  function scheduleCloudSave(title = currentResumeTitle.value || '我的简历') { if (cloudSaveTimer) clearTimeout(cloudSaveTimer); cloudSaveTimer = setTimeout(() => { cloudSaveTimer = null; saveToCloud(title).catch((error) => console.warn('Failed to autosave resume to cloud', error)) }, CLOUD_SAVE_DELAY_MS) }
-  async function loadResumeById(resumeId: number) { const response = await getResumeById(resumeId); if (!response.ok) throw new Error(`简历加载失败 (${response.status})`); const payload = await response.json().catch(() => null); cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null; cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null; currentResumeTitle.value = typeof payload?.title === 'string' ? payload.title : '我的简历'; if (payload?.content && typeof payload.content === 'object') { localStorage.setItem(activeStorageKey, JSON.stringify(payload.content)); resetResumeState(); applyResumeData(payload.content) } return payload }
-  async function loadFromCloud() { const response = await getCurrentResume(); if (!response.ok) throw new Error(`云端加载失败 (${response.status})`); const payload = await response.json().catch(() => null); cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null; cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null; currentResumeTitle.value = typeof payload?.title === 'string' ? payload.title : '我的简历'; if (payload?.content && typeof payload.content === 'object' && Object.keys(payload.content).length > 0) { localStorage.setItem(activeStorageKey, JSON.stringify(payload.content)); resetResumeState(); applyResumeData(payload.content) } await fetchResumeList().catch(() => undefined); return payload }
-  async function createNewResume(title = '新的简历') { const response = await createResume({ title, content: {} }); if (!response.ok) throw new Error(`新建简历失败 (${response.status})`); const payload = await response.json().catch(() => null); cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null; cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null; currentResumeTitle.value = typeof payload?.title === 'string' ? payload.title : title; resetResumeState(); localStorage.setItem(activeStorageKey, JSON.stringify({})); await fetchResumeList().catch(() => undefined); return payload }
-  async function deleteCurrentResume() { if (!cloudResumeId.value) return; const id = cloudResumeId.value; const response = await deleteResumeById(id); if (!response.ok) throw new Error(`删除简历失败 (${response.status})`); cloudResumeId.value = null; cloudUpdatedAt.value = null; currentResumeTitle.value = '我的简历'; await fetchResumeList(); if (resumeList.value.length > 0) { await loadResumeById(resumeList.value[0].id) } else { resetResumeState(); localStorage.setItem(activeStorageKey, JSON.stringify({})) } }
+  function scheduleCloudSave(title = currentResumeTitle.value || '我的简历') { if (operationState.value !== 'idle' || !currentResumeLoaded.value || !cloudResumeId.value) return; if (cloudSaveTimer) clearTimeout(cloudSaveTimer); cloudSaveTimer = setTimeout(() => { if (operationState.value !== 'idle' || !currentResumeLoaded.value || !cloudResumeId.value) return; cloudSaveTimer = null; saveToCloud(title).catch((error) => console.warn('Failed to autosave resume to cloud', error)) }, CLOUD_SAVE_DELAY_MS) }
+  async function loadResumeById(resumeId: number) { operationState.value = 'switching'; const response = await getResumeById(resumeId); if (!response.ok) throw new Error(`简历加载失败 (${response.status})`); const payload = await response.json().catch(() => null); cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null; cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null; currentResumeTitle.value = typeof payload?.title === 'string' ? payload.title : '我的简历'; if (payload?.content && typeof payload.content === 'object') { localStorage.setItem(activeStorageKey, JSON.stringify(payload.content)); resetResumeState(); applyResumeData(payload.content) } currentResumeLoaded.value = true; operationState.value = 'idle'; return payload }
+  async function loadFromCloud() { operationState.value = 'loading'; const response = await getCurrentResume(); if (!response.ok) throw new Error(`云端加载失败 (${response.status})`); const payload = await response.json().catch(() => null); cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null; cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null; currentResumeTitle.value = typeof payload?.title === 'string' ? payload.title : '我的简历'; if (payload?.content && typeof payload.content === 'object' && Object.keys(payload.content).length > 0) { localStorage.setItem(activeStorageKey, JSON.stringify(payload.content)); resetResumeState(); applyResumeData(payload.content) } currentResumeLoaded.value = true; await fetchResumeList().catch(() => undefined); operationState.value = 'idle'; return payload }
+  async function createNewResume(title = '新的简历') { operationState.value = 'creating'; const response = await createResume({ title, content: {} }); if (!response.ok) throw new Error(`新建简历失败 (${response.status})`); const payload = await response.json().catch(() => null); cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null; cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null; currentResumeTitle.value = typeof payload?.title === 'string' ? payload.title : title; resetResumeState(); localStorage.setItem(activeStorageKey, JSON.stringify({})); currentResumeLoaded.value = true; await fetchResumeList().catch(() => undefined); operationState.value = 'idle'; return payload }
+  async function deleteCurrentResume() { if (!cloudResumeId.value) return; operationState.value = 'deleting'; const id = cloudResumeId.value; const response = await deleteResumeById(id); if (!response.ok) throw new Error(`删除简历失败 (${response.status})`); cloudResumeId.value = null; cloudUpdatedAt.value = null; currentResumeTitle.value = '我的简历'; await fetchResumeList(); if (resumeList.value.length > 0) { await loadResumeById(resumeList.value[0].id) } else { resetResumeState(); currentResumeLoaded.value = false; localStorage.setItem(activeStorageKey, JSON.stringify({})); operationState.value = 'idle' } }
 
   function toggleModule(key: string) { const mod = modules.find((m) => m.key === key); if (mod) mod.visible = !mod.visible }
   function setTemplate(key: ResumeTemplateKey) { selectedTemplateKey.value = key }
@@ -154,5 +162,5 @@ export const useResumeStore = defineStore('resume', () => {
     saveTimer = setTimeout(() => { saveTimer = null; saveToStorage('auto') }, AUTO_SAVE_DELAY_MS)
   }, { deep: true })
 
-  return { modules, selectedTemplateKey, basicInfo, educationList, skills, workList, projectList, awardList, selfIntro, toggleModule, setTemplate, canMoveModule, moveModule, reorderModule, isDefaultModuleOrder, resetModuleOrder, isModuleVisible, addEducation, removeEducation, addWork, removeWork, addProject, removeProject, canMoveProject, moveProject, addAward, removeAward, exportResumeData, snapshotResumeData, importResumeData, saveToStorage, saveToCloud, scheduleCloudSave, loadFromCloud, loadResumeById, fetchResumeList, createNewResume, deleteCurrentResume, updateStorageKey, autoSaveDelayMs: AUTO_SAVE_DELAY_MS, nextAutoSaveAt, lastSavedAt, lastSaveMode, isSaving, cloudResumeId, cloudUpdatedAt, resumeList, currentResumeTitle }
+  return { modules, selectedTemplateKey, basicInfo, educationList, skills, workList, projectList, awardList, selfIntro, toggleModule, setTemplate, canMoveModule, moveModule, reorderModule, isDefaultModuleOrder, resetModuleOrder, isModuleVisible, addEducation, removeEducation, addWork, removeWork, addProject, removeProject, canMoveProject, moveProject, addAward, removeAward, exportResumeData, snapshotResumeData, importResumeData, saveToStorage, saveToCloud, scheduleCloudSave, loadFromCloud, loadResumeById, fetchResumeList, createNewResume, deleteCurrentResume, updateStorageKey, autoSaveDelayMs: AUTO_SAVE_DELAY_MS, nextAutoSaveAt, lastSavedAt, lastSaveMode, isSaving, cloudResumeId, cloudUpdatedAt, resumeList, currentResumeTitle, currentResumeLoaded, operationState }
 })
