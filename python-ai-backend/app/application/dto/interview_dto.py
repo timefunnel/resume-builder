@@ -26,6 +26,7 @@ class InterviewTurnRequestDto:
     command: str = "continue"
     user_input: str | None = None
     session_id: str | None = None
+    resume_id: int | None = None
     memory_summary: str | None = None
     duration_minutes: int | None = 60
     elapsed_seconds: int | None = 0
@@ -39,6 +40,7 @@ class InterviewTurnRequestDto:
             "command": self.command,
             "userInput": self.user_input,
             "sessionId": self.session_id,
+            "resumeId": self.resume_id,
             "memorySummary": self.memory_summary,
             "durationMinutes": self.duration_minutes,
             "elapsedSeconds": self.elapsed_seconds,

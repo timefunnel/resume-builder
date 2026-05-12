@@ -18,6 +18,7 @@ def interview_turn_request_to_dto(request: InterviewTurnRequest, *, user_id: int
         command=request.command,
         user_input=request.userInput,
         session_id=request.sessionId,
+        resume_id=request.resumeId,
         memory_summary=request.memorySummary,
         duration_minutes=request.durationMinutes,
         elapsed_seconds=request.elapsedSeconds,

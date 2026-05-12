@@ -20,6 +20,7 @@ class InterviewTurnRequest(BaseModel):
     command: str = "continue"
     userInput: str | None = None
     sessionId: str | None = None
+    resumeId: int | None = None
     memorySummary: str | None = None
     durationMinutes: int | None = 60
     elapsedSeconds: int | None = 0

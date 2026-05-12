@@ -19,7 +19,7 @@ class MySqlConnectionConfig:
 
 
 def _safe_text(value: Any) -> str:
-    return str(value or "").strip()
+    return str(value or '').strip()
 
 
 def _parse_iso_datetime(value: Any) -> datetime:
@@ -27,7 +27,7 @@ def _parse_iso_datetime(value: Any) -> datetime:
     if not safe_value:
         return datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
     try:
-        parsed = datetime.fromisoformat(safe_value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(safe_value.replace('Z', '+00:00'))
     except ValueError:
         return datetime.now(timezone.utc).replace(microsecond=0, tzinfo=None)
     if parsed.tzinfo is None:
@@ -37,9 +37,9 @@ def _parse_iso_datetime(value: Any) -> datetime:
 
 def _format_iso_datetime(value: Any) -> str:
     if not isinstance(value, datetime):
-        return ""
+        return ''
     safe_value = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
-    return safe_value.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return safe_value.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace('+00:00', 'Z')
 
 
 def _loads_json(value: Any) -> Any:
@@ -61,27 +61,27 @@ def _dumps_json(value: Any) -> str | None:
 def _parse_mysql_config(datasource_url: str, username: str, password: str) -> MySqlConnectionConfig:
     safe_url = _safe_text(datasource_url)
     if not safe_url:
-        raise RuntimeError("MYSQL_DATASOURCE_URL is missing")
+        raise RuntimeError('MYSQL_DATASOURCE_URL is missing')
 
-    normalized_url = safe_url[5:] if safe_url.startswith("jdbc:") else safe_url
-    if normalized_url.startswith("mysql+pymysql://"):
-        normalized_url = "mysql://" + normalized_url[len("mysql+pymysql://") :]
+    normalized_url = safe_url[5:] if safe_url.startswith('jdbc:') else safe_url
+    if normalized_url.startswith('mysql+pymysql://'):
+        normalized_url = 'mysql://' + normalized_url[len('mysql+pymysql://') :]
 
     parsed = urlsplit(normalized_url)
-    if parsed.scheme != "mysql":
-        raise RuntimeError("MYSQL_DATASOURCE_URL must use a mysql scheme")
+    if parsed.scheme != 'mysql':
+        raise RuntimeError('MYSQL_DATASOURCE_URL must use a mysql scheme')
 
-    database = parsed.path.lstrip("/")
+    database = parsed.path.lstrip('/')
     if not database:
-        raise RuntimeError("MYSQL_DATASOURCE_URL must include database name")
+        raise RuntimeError('MYSQL_DATASOURCE_URL must include database name')
 
-    resolved_username = unquote(parsed.username or "") or _safe_text(username)
-    resolved_password = unquote(parsed.password or "") or _safe_text(password)
+    resolved_username = unquote(parsed.username or '') or _safe_text(username)
+    resolved_password = unquote(parsed.password or '') or _safe_text(password)
     if not resolved_username:
-        raise RuntimeError("MySQL username is missing")
+        raise RuntimeError('MySQL username is missing')
 
     return MySqlConnectionConfig(
-        host=_safe_text(parsed.hostname) or "127.0.0.1",
+        host=_safe_text(parsed.hostname) or '127.0.0.1',
         port=parsed.port or 3306,
         database=database,
         username=resolved_username,
@@ -90,14 +90,11 @@ def _parse_mysql_config(datasource_url: str, username: str, password: str) -> My
 
 
 class MySqlInterviewSessionRepository(InterviewSessionRepository):
-    def __init__(self, datasource_url: str, username: str = "", password: str = "") -> None:
+    def __init__(self, datasource_url: str, username: str = '', password: str = '') -> None:
         self._config = _parse_mysql_config(datasource_url, username, password)
 
     def _connect(self):
-        try:
-            import pymysql
-        except ImportError as exc:  # pragma: no cover
-            raise RuntimeError("PyMySQL is required for MySQL interview session storage") from exc
+        import pymysql
 
         return pymysql.connect(
             host=self._config.host,
@@ -105,41 +102,29 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
             user=self._config.username,
             password=self._config.password,
             database=self._config.database,
-            charset="utf8mb4",
+            charset='utf8mb4',
             cursorclass=pymysql.cursors.DictCursor,
             autocommit=False,
         )
 
-    def _message_rows(self, session_id: str, messages: "list[dict[str, Any]]") -> "list[tuple[Any, ...]]":
+    def _message_rows(self, session_id: str, user_id: int, messages: "list[dict[str, Any]]") -> "list[tuple[Any, ...]]":
         rows: list[tuple[Any, ...]] = []
         for index, message in enumerate(messages, start=1):
             if not isinstance(message, dict):
                 continue
-            content = _safe_text(message.get("content"))
+            content = _safe_text(message.get('content'))
             if not content:
                 continue
-
-            raw_score = message.get("score")
+            raw_score = message.get('score')
             score = None
-            score_comment = ""
+            score_comment = ''
             if isinstance(raw_score, dict):
                 try:
-                    score = max(0, min(100, int(raw_score.get("score", 0))))
+                    score = max(0, min(100, int(raw_score.get('score', 0))))
                 except (TypeError, ValueError):
                     score = 0
-                score_comment = _safe_text(raw_score.get("comment"))
-
-            rows.append(
-                (
-                    session_id,
-                    index,
-                    "assistant" if _safe_text(message.get("role")).lower() == "assistant" else "user",
-                    content,
-                    score,
-                    score_comment,
-                    _parse_iso_datetime(message.get("createdAt")),
-                )
-            )
+                score_comment = _safe_text(raw_score.get('comment'))
+            rows.append((session_id, int(user_id), index, 'assistant' if _safe_text(message.get('role')).lower() == 'assistant' else 'user', content, score, score_comment, _parse_iso_datetime(message.get('createdAt'))))
         return rows
 
     def save(self, user_id: int, session_id: str, session: dict[str, Any]) -> None:
@@ -148,33 +133,23 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
             return
 
         safe_session = session if isinstance(session, dict) else {}
-        final_evaluation = safe_session.get("finalEvaluation") if isinstance(safe_session.get("finalEvaluation"), dict) else None
-        messages = safe_session.get("messages") if isinstance(safe_session.get("messages"), list) else []
-        total_score = final_evaluation.get("totalScore") if isinstance(final_evaluation, dict) else None
-        passed = final_evaluation.get("passed") if isinstance(final_evaluation, dict) else None
-
+        final_evaluation = safe_session.get('finalEvaluation') if isinstance(safe_session.get('finalEvaluation'), dict) else None
+        messages = safe_session.get('messages') if isinstance(safe_session.get('messages'), list) else []
+        total_score = final_evaluation.get('totalScore') if isinstance(final_evaluation, dict) else None
+        passed = final_evaluation.get('passed') if isinstance(final_evaluation, dict) else None
         connection = self._connect()
         try:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
                     INSERT INTO interview_sessions (
-                        session_id,
-                        user_id,
-                        mode,
-                        status,
-                        duration_minutes,
-                        elapsed_seconds,
-                        memory_summary,
-                        final_evaluation_json,
-                        resume_snapshot_json,
-                        total_score,
-                        passed,
-                        created_at,
-                        updated_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        session_id, user_id, resume_id, mode, status, duration_minutes, elapsed_seconds,
+                        memory_summary, final_evaluation_json, resume_snapshot_json, total_score, passed,
+                        created_at, updated_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON DUPLICATE KEY UPDATE
                         user_id = VALUES(user_id),
+                        resume_id = VALUES(resume_id),
                         mode = VALUES(mode),
                         status = VALUES(status),
                         duration_minutes = VALUES(duration_minutes),
@@ -189,33 +164,28 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
                     (
                         safe_session_id,
                         int(user_id),
-                        "interviewer" if _safe_text(safe_session.get("mode")).lower() == "interviewer" else "candidate",
-                        "finished" if _safe_text(safe_session.get("status")).lower() == "finished" else "active",
-                        max(1, int(safe_session.get("durationMinutes") or 60)),
-                        max(0, int(safe_session.get("elapsedSeconds") or 0)),
-                        _safe_text(safe_session.get("memorySummary")),
+                        int(safe_session.get('resumeId') or 0) or None,
+                        'interviewer' if _safe_text(safe_session.get('mode')).lower() == 'interviewer' else 'candidate',
+                        'finished' if _safe_text(safe_session.get('status')).lower() == 'finished' else 'active',
+                        max(1, int(safe_session.get('durationMinutes') or 60)),
+                        max(0, int(safe_session.get('elapsedSeconds') or 0)),
+                        _safe_text(safe_session.get('memorySummary')),
                         _dumps_json(final_evaluation),
-                        _dumps_json(safe_session.get("resumeSnapshot")),
+                        _dumps_json(safe_session.get('resumeSnapshot')),
                         total_score if isinstance(total_score, int) else None,
                         1 if passed is True else 0 if passed is False else None,
-                        _parse_iso_datetime(safe_session.get("createdAt")),
-                        _parse_iso_datetime(safe_session.get("updatedAt")),
+                        _parse_iso_datetime(safe_session.get('createdAt')),
+                        _parse_iso_datetime(safe_session.get('updatedAt')),
                     ),
                 )
-                cursor.execute("DELETE FROM interview_session_messages WHERE session_id = %s", (safe_session_id,))
-                message_rows = self._message_rows(safe_session_id, messages)
+                cursor.execute('DELETE FROM interview_session_messages WHERE session_id = %s', (safe_session_id,))
+                message_rows = self._message_rows(safe_session_id, user_id, messages)
                 if message_rows:
                     cursor.executemany(
                         """
                         INSERT INTO interview_session_messages (
-                            session_id,
-                            seq_no,
-                            role,
-                            content,
-                            score,
-                            score_comment,
-                            created_at
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            session_id, user_id, seq_no, role, content, score, score_comment, created_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                         """,
                         message_rows,
                     )
@@ -233,18 +203,8 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT
-                        session_id,
-                        user_id,
-                        mode,
-                        status,
-                        duration_minutes,
-                        elapsed_seconds,
-                        memory_summary,
-                        final_evaluation_json,
-                        resume_snapshot_json,
-                        created_at,
-                        updated_at
+                    SELECT session_id, user_id, resume_id, mode, status, duration_minutes, elapsed_seconds,
+                           memory_summary, final_evaluation_json, resume_snapshot_json, created_at, updated_at
                     FROM interview_sessions
                     WHERE user_id = %s
                     ORDER BY updated_at DESC
@@ -252,8 +212,7 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
                     """,
                     (int(user_id), safe_limit),
                 )
-                session_rows = list(cursor.fetchall())
-                return self._hydrate_sessions(cursor, session_rows)
+                return self._hydrate_sessions(cursor, list(cursor.fetchall()))
         finally:
             connection.close()
 
@@ -261,24 +220,13 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
         safe_session_id = _safe_text(session_id)
         if not safe_session_id:
             return None
-
         connection = self._connect()
         try:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT
-                        session_id,
-                        user_id,
-                        mode,
-                        status,
-                        duration_minutes,
-                        elapsed_seconds,
-                        memory_summary,
-                        final_evaluation_json,
-                        resume_snapshot_json,
-                        created_at,
-                        updated_at
+                    SELECT session_id, user_id, resume_id, mode, status, duration_minutes, elapsed_seconds,
+                           memory_summary, final_evaluation_json, resume_snapshot_json, created_at, updated_at
                     FROM interview_sessions
                     WHERE session_id = %s AND user_id = %s
                     LIMIT 1
@@ -296,22 +244,13 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
     def _hydrate_sessions(self, cursor, session_rows: "list[dict[str, Any]]") -> "list[dict[str, Any]]":
         if not session_rows:
             return []
-
-        session_ids = [_safe_text(row.get("session_id")) for row in session_rows if _safe_text(row.get("session_id"))]
+        session_ids = [_safe_text(row.get('session_id')) for row in session_rows if _safe_text(row.get('session_id'))]
         messages_by_session: dict[str, list[dict[str, Any]]] = defaultdict(list)
-
         if session_ids:
-            placeholders = ", ".join(["%s"] * len(session_ids))
+            placeholders = ', '.join(['%s'] * len(session_ids))
             cursor.execute(
                 f"""
-                SELECT
-                    session_id,
-                    seq_no,
-                    role,
-                    content,
-                    score,
-                    score_comment,
-                    created_at
+                SELECT session_id, seq_no, role, content, score, score_comment, created_at
                 FROM interview_session_messages
                 WHERE session_id IN ({placeholders})
                 ORDER BY session_id ASC, seq_no ASC
@@ -319,41 +258,33 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
                 session_ids,
             )
             for row in cursor.fetchall():
-                safe_session_id = _safe_text(row.get("session_id"))
-                score = row.get("score")
+                safe_session_id = _safe_text(row.get('session_id'))
+                score = row.get('score')
                 score_value = None
                 if isinstance(score, int):
-                    score_value = {
-                        "score": max(0, min(100, score)),
-                        "comment": _safe_text(row.get("score_comment")),
-                    }
-
-                messages_by_session[safe_session_id].append(
-                    {
-                        "role": "assistant" if _safe_text(row.get("role")).lower() == "assistant" else "user",
-                        "content": _safe_text(row.get("content")),
-                        "score": score_value,
-                        "createdAt": _format_iso_datetime(row.get("created_at")),
-                    }
-                )
+                    score_value = {'score': max(0, min(100, score)), 'comment': _safe_text(row.get('score_comment'))}
+                messages_by_session[safe_session_id].append({'role': 'assistant' if _safe_text(row.get('role')).lower() == 'assistant' else 'user', 'content': _safe_text(row.get('content')), 'score': score_value, 'createdAt': _format_iso_datetime(row.get('created_at'))})
 
         sessions: list[dict[str, Any]] = []
         for row in session_rows:
-            safe_session_id = _safe_text(row.get("session_id"))
+            safe_session_id = _safe_text(row.get('session_id'))
+            final_evaluation = _loads_json(row.get('final_evaluation_json'))
+            resume_snapshot = _loads_json(row.get('resume_snapshot_json'))
             sessions.append(
                 {
-                    "sessionId": safe_session_id,
-                    "mode": "interviewer" if _safe_text(row.get("mode")).lower() == "interviewer" else "candidate",
-                    "status": "finished" if _safe_text(row.get("status")).lower() == "finished" else "active",
-                    "durationMinutes": max(1, int(row.get("duration_minutes") or 60)),
-                    "elapsedSeconds": max(0, int(row.get("elapsed_seconds") or 0)),
-                    "memorySummary": _safe_text(row.get("memory_summary")),
-                    "finalEvaluation": _loads_json(row.get("final_evaluation_json")),
-                    "resumeSnapshot": _loads_json(row.get("resume_snapshot_json")),
-                    "messages": messages_by_session.get(safe_session_id, []),
-                    "createdAt": _format_iso_datetime(row.get("created_at")),
-                    "updatedAt": _format_iso_datetime(row.get("updated_at")),
+                    'sessionId': safe_session_id,
+                    'userId': row.get('user_id'),
+                    'resumeId': row.get('resume_id'),
+                    'mode': 'interviewer' if _safe_text(row.get('mode')).lower() == 'interviewer' else 'candidate',
+                    'status': 'finished' if _safe_text(row.get('status')).lower() == 'finished' else 'active',
+                    'durationMinutes': int(row.get('duration_minutes') or 60),
+                    'elapsedSeconds': int(row.get('elapsed_seconds') or 0),
+                    'memorySummary': _safe_text(row.get('memory_summary')),
+                    'finalEvaluation': final_evaluation if isinstance(final_evaluation, dict) else None,
+                    'resumeSnapshot': resume_snapshot if isinstance(resume_snapshot, dict) else None,
+                    'messages': messages_by_session.get(safe_session_id, []),
+                    'createdAt': _format_iso_datetime(row.get('created_at')),
+                    'updatedAt': _format_iso_datetime(row.get('updated_at')),
                 }
             )
-
         return sessions

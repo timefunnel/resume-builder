@@ -72,6 +72,7 @@ def _new_session_record(session_id: str, request: InterviewTurnRequestDto, now_i
     return {
         "sessionId": session_id,
         "mode": "interviewer" if request.mode == "interviewer" else "candidate",
+        "resumeId": request.resume_id,
         "status": "active",
         "durationMinutes": max(1, int(request.duration_minutes or 60)),
         "elapsedSeconds": max(0, int(request.elapsed_seconds or 0)),
@@ -140,6 +141,8 @@ def _session_to_summary(session: dict[str, Any]) -> dict[str, Any]:
     final_evaluation = session.get("finalEvaluation")
     return {
         "sessionId": session.get("sessionId"),
+        "resumeId": session.get("resumeId"),
+        "resumeId": session.get("resumeId"),
         "mode": session.get("mode", "candidate"),
         "status": session.get("status", "active"),
         "durationMinutes": session.get("durationMinutes", 60),
@@ -156,6 +159,7 @@ def _session_to_summary(session: dict[str, Any]) -> dict[str, Any]:
 def _session_to_detail(session: dict[str, Any]) -> dict[str, Any]:
     return {
         "sessionId": session.get("sessionId"),
+        "resumeId": session.get("resumeId"),
         "mode": session.get("mode", "candidate"),
         "status": session.get("status", "active"),
         "durationMinutes": session.get("durationMinutes", 60),
