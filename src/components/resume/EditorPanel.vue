@@ -139,6 +139,24 @@ const moduleCompletion = computed<Record<string, number>>(() => {
   }
 })
 
+
+const aiImportSummary = computed(() => {
+  if (!aiImportedDraft.value) return null
+  const content = aiImportedDraft.value.content as Record<string, any>
+  const basicInfo = (content.basicInfo || {}) as Record<string, any>
+  return {
+    name: String(basicInfo.name || '').trim(),
+    phone: String(basicInfo.phone || '').trim(),
+    email: String(basicInfo.email || '').trim(),
+    jobTitle: String(basicInfo.jobTitle || '').trim(),
+    educationCount: Array.isArray(content.educationList) ? content.educationList.length : 0,
+    workCount: Array.isArray(content.workList) ? content.workList.length : 0,
+    projectCount: Array.isArray(content.projectList) ? content.projectList.length : 0,
+    skills: String(content.skills || '').trim(),
+    extractedTextPreview: String(aiImportedDraft.value.extractedText || '').trim().slice(0, 500),
+  }
+})
+
 const completionPercent = computed(() => {
   const enabledModules = store.modules.filter((m) => m.visible)
   if (enabledModules.length === 0) return 0
@@ -595,6 +613,22 @@ onUnmounted(() => {
         <div class="ai-import-result-copy">
           <strong>AI 已完成简历解析：{{ aiImportedDraft.title }}</strong>
           <p>你可以先应用到当前编辑中的简历，或者直接另存为一份新简历。</p>
+          <div v-if="aiImportSummary" class="ai-import-preview">
+            <div class="ai-import-preview-grid">
+              <span><b>姓名：</b>{{ aiImportSummary.name || '未识别' }}</span>
+              <span><b>电话：</b>{{ aiImportSummary.phone || '未识别' }}</span>
+              <span><b>邮箱：</b>{{ aiImportSummary.email || '未识别' }}</span>
+              <span><b>求职意向：</b>{{ aiImportSummary.jobTitle || '未识别' }}</span>
+              <span><b>教育经历：</b>{{ aiImportSummary.educationCount }}</span>
+              <span><b>工作经历：</b>{{ aiImportSummary.workCount }}</span>
+              <span><b>项目经历：</b>{{ aiImportSummary.projectCount }}</span>
+            </div>
+            <p v-if="aiImportSummary.skills" class="ai-import-preview-skills"><b>技能摘要：</b>{{ aiImportSummary.skills }}</p>
+            <details v-if="aiImportSummary.extractedTextPreview" class="ai-import-preview-text">
+              <summary>查看提取文本预览</summary>
+              <pre>{{ aiImportSummary.extractedTextPreview }}</pre>
+            </details>
+          </div>
         </div>
         <div class="ai-import-result-actions">
           <button class="btn-import" type="button" @click="applyImportedDraftToCurrent">应用到当前简历</button>
@@ -647,5 +681,11 @@ onUnmounted(() => {
 .ai-import-result { margin: 14px 0 0; padding: 14px 16px; border: 1px solid #e7d8c8; border-radius: 16px; background: #fff8f1; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
 .ai-import-result-copy strong { display:block; margin-bottom: 4px; color:#2d2521; }
 .ai-import-result-copy p { margin:0; color:#7b6a5b; font-size:12px; line-height:1.6; }
+.ai-import-preview { margin-top:10px; padding-top:10px; border-top:1px dashed #e7d8c8; }
+.ai-import-preview-grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:6px 12px; font-size:12px; color:#5f534a; }
+.ai-import-preview-skills { margin:8px 0 0; font-size:12px; color:#5f534a; line-height:1.6; }
+.ai-import-preview-text { margin-top:10px; }
+.ai-import-preview-text summary { cursor:pointer; font-size:12px; font-weight:800; color:#7b6a5b; }
+.ai-import-preview-text pre { margin:8px 0 0; max-height:180px; overflow:auto; padding:10px 12px; border-radius:12px; background:#fff; font-size:12px; line-height:1.5; white-space:pre-wrap; color:#4c4038; }
 .ai-import-result-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 </style>
