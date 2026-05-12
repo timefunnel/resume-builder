@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useResumeStore } from '@/stores/resume'
 import KnowledgeBasePanel from '@/components/ai/knowledge/KnowledgeBasePanel.vue'
 import AiInterviewerPanel from '@/components/ai/interview/AiInterviewerPanel.vue'
 import ModuleSidebar from '@/components/common/ModuleSidebar.vue'
@@ -18,6 +19,7 @@ import {
 } from '@/router/menuRoutes'
 
 const authStore = useAuthStore()
+const resumeStore = useResumeStore()
 const sidebarCollapsed = ref(false)
 type ResumeMobilePane = 'editor' | 'preview'
 const activeMenu = ref<PrimaryMenuKey>(
@@ -101,7 +103,11 @@ function handleSelectMenu(key: PrimaryMenuKey) {
 }
 
 onMounted(() => {
-  authStore.fetchMe().catch(() => undefined)
+  authStore.fetchMe().then((user) => {
+    if (user) {
+      resumeStore.loadFromCloud().catch(() => undefined)
+    }
+  }).catch(() => undefined)
   syncMenuFromLocation()
   window.addEventListener('popstate', syncMenuFromLocation)
 })

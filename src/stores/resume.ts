@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { getCurrentResume, putCurrentResume } from '@/api/resumeApi'
 import { reactive, ref, watch } from 'vue'
 import { normalizeResumeTemplateKey, type ResumeTemplateKey } from '@/templates/resume'
 // author: jf
@@ -337,6 +338,8 @@ export const useResumeStore = defineStore('resume', () => {
   }
 
   const STORAGE_KEY = 'resume-builder-data'
+  const cloudResumeId = ref<number | null>(null)
+  const cloudUpdatedAt = ref<string | null>(null)
   const AUTO_SAVE_DELAY_MS = 500
   const SAVE_LOADING_MIN_MS = 900
 
@@ -349,6 +352,20 @@ export const useResumeStore = defineStore('resume', () => {
       isSaving.value = false
       saveLoadingTimer = null
     }, SAVE_LOADING_MIN_MS)
+  }
+
+  function snapshotResumeData() {
+    return {
+      modules: modules.map((m) => ({ ...m })),
+      selectedTemplateKey: selectedTemplateKey.value,
+      basicInfo: { ...basicInfo },
+      educationList: educationList.map((e) => ({ ...e })),
+      skills: skills.value,
+      workList: workList.map((w) => ({ ...w })),
+      projectList: projectList.map((p) => ({ ...p })),
+      awardList: awardList.map((a) => ({ ...a })),
+      selfIntro: selfIntro.value,
+    }
   }
 
   function exportResumeData(): string {
@@ -371,17 +388,7 @@ export const useResumeStore = defineStore('resume', () => {
       saveTimer = null
     }
     markSavingState()
-    const data = {
-      modules: modules.map((m) => ({ ...m })),
-      selectedTemplateKey: selectedTemplateKey.value,
-      basicInfo: { ...basicInfo },
-      educationList: educationList.map((e) => ({ ...e })),
-      skills: skills.value,
-      workList: workList.map((w) => ({ ...w })),
-      projectList: projectList.map((p) => ({ ...p })),
-      awardList: awardList.map((a) => ({ ...a })),
-      selfIntro: selfIntro.value,
-    }
+    const data = snapshotResumeData()
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
     nextAutoSaveAt.value = null
     lastSavedAt.value = Date.now()
@@ -392,6 +399,35 @@ export const useResumeStore = defineStore('resume', () => {
     JSON.parse(raw)
     localStorage.setItem(STORAGE_KEY, raw)
     loadFromStorage()
+
+  async function saveToCloud(title = '我的简历') {
+    markSavingState()
+    const response = await putCurrentResume({ title, content: snapshotResumeData() })
+    if (!response.ok) {
+      const text = await response.text().catch(() => '')
+      throw new Error(text || `云端保存失败 (${response.status})`)
+    }
+    const payload = await response.json().catch(() => null)
+    cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null
+    cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null
+    lastSavedAt.value = Date.now()
+    lastSaveMode.value = 'manual'
+    return payload
+  }
+
+  async function loadFromCloud() {
+    const response = await getCurrentResume()
+    if (!response.ok) {
+      throw new Error(`云端加载失败 (${response.status})`)
+    }
+    const payload = await response.json().catch(() => null)
+    cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null
+    cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null
+    if (payload?.content && typeof payload.content === 'object' && Object.keys(payload.content).length > 0) {
+      importResumeData(JSON.stringify(payload.content))
+    }
+    return payload
+  }
     saveToStorage('manual')
   }
 
@@ -452,6 +488,35 @@ export const useResumeStore = defineStore('resume', () => {
 
   loadFromStorage()
 
+  async function saveToCloud(title = '我的简历') {
+    markSavingState()
+    const response = await putCurrentResume({ title, content: snapshotResumeData() })
+    if (!response.ok) {
+      const text = await response.text().catch(() => '')
+      throw new Error(text || `云端保存失败 (${response.status})`)
+    }
+    const payload = await response.json().catch(() => null)
+    cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null
+    cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null
+    lastSavedAt.value = Date.now()
+    lastSaveMode.value = 'manual'
+    return payload
+  }
+
+  async function loadFromCloud() {
+    const response = await getCurrentResume()
+    if (!response.ok) {
+      throw new Error(`云端加载失败 (${response.status})`)
+    }
+    const payload = await response.json().catch(() => null)
+    cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null
+    cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null
+    if (payload?.content && typeof payload.content === 'object' && Object.keys(payload.content).length > 0) {
+      importResumeData(JSON.stringify(payload.content))
+    }
+    return payload
+  }
+
   let saveTimer: ReturnType<typeof setTimeout> | null = null
   watch(
     [
@@ -505,12 +570,17 @@ export const useResumeStore = defineStore('resume', () => {
     addAward,
     removeAward,
     exportResumeData,
+    snapshotResumeData,
     importResumeData,
     saveToStorage,
+    saveToCloud,
+    loadFromCloud,
     autoSaveDelayMs: AUTO_SAVE_DELAY_MS,
     nextAutoSaveAt,
     lastSavedAt,
     lastSaveMode,
     isSaving,
+    cloudResumeId,
+    cloudUpdatedAt,
   }
 })

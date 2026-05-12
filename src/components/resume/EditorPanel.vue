@@ -2,6 +2,7 @@
 // author: jf
 import { computed, onMounted, onUnmounted, reactive, ref, type Component } from 'vue'
 import { useResumeStore } from '@/stores/resume'
+import { useAuthStore } from '@/stores/auth'
 import BasicInfoEditor from './editors/BasicInfoEditor.vue'
 import EducationEditor from './editors/EducationEditor.vue'
 import SkillsEditor from './editors/SkillsEditor.vue'
@@ -13,6 +14,7 @@ import AiOptimizePanel from '@/components/ai/AiOptimizePanel.vue'
 import { getModuleIconPaths, MODULE_ICON_VIEWBOX } from '@/constants/moduleIcons'
 
 const store = useResumeStore()
+const authStore = useAuthStore()
 const showSaved = ref(false)
 const searchValue = ref('')
 const showAiPanel = ref(false)
@@ -137,8 +139,15 @@ const completionPercent = computed(() => {
   return Math.round((total / enabledModules.length) * 100)
 })
 
-function handleSave() {
+async function handleSave() {
   store.saveToStorage()
+  if (authStore.isLoggedIn) {
+    try {
+      await store.saveToCloud()
+    } catch (error) {
+      console.warn('Failed to save resume to cloud', error)
+    }
+  }
   showSaved.value = true
   setTimeout(() => {
     showSaved.value = false
