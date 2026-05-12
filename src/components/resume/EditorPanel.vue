@@ -30,6 +30,7 @@ const resumeTitleInputRef = ref<HTMLInputElement | null>(null)
 const titleDirty = ref(false)
 const aiImportInputRef = ref<HTMLInputElement | null>(null)
 const aiImporting = ref(false)
+const aiImportStageText = ref('')
 const aiImportError = ref('')
 const aiImportSuccess = ref('')
 const aiImportedDraft = ref<{ title: string; content: Record<string, unknown>; extractedText: string } | null>(null)
@@ -233,9 +234,11 @@ async function handleAiImport(event: Event) {
   if (!file) return
   input.value = ''
   aiImporting.value = true
+  aiImportStageText.value = '正在上传并解析简历…'
   aiImportError.value = ''
   aiImportSuccess.value = ''
   try {
+    aiImportStageText.value = '正在调用 AI 结构化简历…'
     const response = await importResumeWithAi(file)
     const payload = await response.json().catch(() => null)
     if (!response.ok) {
@@ -247,13 +250,16 @@ async function handleAiImport(event: Event) {
         content: payload.content,
         extractedText: typeof payload.extractedText === 'string' ? payload.extractedText : '',
       }
+      aiImportStageText.value = ''
       aiImportSuccess.value = 'AI 已完成简历解析，请先预览结果再决定如何导入。'
     }
   } catch (error) {
+    aiImportStageText.value = ''
     aiImportError.value = error instanceof Error ? error.message : 'AI 导入失败'
     console.warn('Failed to import resume with AI', error)
   } finally {
     aiImporting.value = false
+    if (!aiImportedDraft.value) aiImportStageText.value = ''
   }
 }
 
@@ -620,6 +626,7 @@ onUnmounted(() => {
         <p v-if="showSaved" class="save-hint">已保存</p>
       </transition>
 
+      <p v-if="aiImporting && aiImportStageText" class="ai-import-feedback processing">{{ aiImportStageText }}</p>
       <p v-if="aiImportError" class="ai-import-feedback error">{{ aiImportError }}</p>
       <p v-if="aiImportSuccess && !aiImportedDraft" class="ai-import-feedback success">{{ aiImportSuccess }}</p>
 
@@ -693,6 +700,7 @@ onUnmounted(() => {
 <style scoped src="./EditorPanel.responsive.css"></style>
 <style scoped>
 .ai-import-feedback { margin:14px 0 0; padding:10px 12px; border-radius:12px; font-size:12px; font-weight:700; }
+.ai-import-feedback.processing { background:#fff8f1; color:#7b6a5b; border:1px solid #ead9c6; }
 .ai-import-feedback.error { background:#fff1f1; color:#b42318; border:1px solid #f1c7c7; }
 .ai-import-feedback.success { background:#effaf3; color:#117a37; border:1px solid #cdebd5; }
 .ai-import-result { margin: 14px 0 0; padding: 14px 16px; border: 1px solid #e7d8c8; border-radius: 16px; background: #fff8f1; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
