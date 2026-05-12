@@ -503,12 +503,25 @@ function buildHistory(excludeLastMessageId?: string): InterviewHistoryItem[] {
 }
 
 
+
+function resolveResumeTitle(resumeId?: number | null): string {
+  if (!resumeId) return '未绑定简历'
+  const item = resumeStore.resumeList.find((resume) => resume.id === resumeId)
+  return item?.title || `简历 #${resumeId}`
+}
+
+const currentResumeContextText = computed(() => {
+  if (!resumeStore.cloudResumeId) return '当前未选择云端简历'
+  return `当前关联简历：${resolveResumeTitle(resumeStore.cloudResumeId)}`
+})
+
 function buildSessionOptionLabel(item: InterviewSessionSummary): string {
   const modeLabel = item.mode === 'candidate' ? '候选人模式' : '面试官模式'
   const statusLabel = item.status === 'finished' ? '已结束' : '进行中'
   const scoreLabel = item.totalScore == null ? '' : ` · ${item.totalScore}分`
+  const resumeLabel = ` · ${resolveResumeTitle(item.resumeId)}`
   const timeLabel = item.updatedAt.replace('T', ' ').slice(0, 16)
-  return `${timeLabel} · ${modeLabel} · ${statusLabel}${scoreLabel}`
+  return `${timeLabel} · ${modeLabel} · ${statusLabel}${resumeLabel}${scoreLabel}`
 }
 
 function applySessionDetail(detail: Awaited<ReturnType<typeof getInterviewSessionDetail>>) {
@@ -619,6 +632,7 @@ async function runInterview(command: InterviewCommand, userInput?: string) {
         sessionId: currentSessionId.value || undefined,
         userInput,
         history: buildHistory(draftMessageId),
+        resumeId: resumeStore.cloudResumeId || undefined,
         resumeSnapshot: resumeSnapshot.value,
         durationMinutes: durationMinutes.value,
         elapsedSeconds: elapsedSeconds.value,

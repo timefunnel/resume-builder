@@ -220,6 +220,7 @@ function normalizeTurnResponse(input: unknown): InterviewTurnResponse {
     finalEvaluation: normalizeFinalEvaluation(source.finalEvaluation),
     memorySummary: String(source.memorySummary ?? '').trim(),
     sessionId: String(source.sessionId ?? '').trim(),
+    resumeId: source.resumeId == null ? null : Number(source.resumeId) || null,
   }
 }
 

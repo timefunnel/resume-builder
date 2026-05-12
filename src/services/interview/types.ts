@@ -47,6 +47,7 @@ export interface InterviewTurnResponse {
 
 export interface InterviewTurnRequest {
   mode: InterviewMode
+  resumeId?: number
   command: InterviewCommand
   sessionId?: string
   userInput?: string
@@ -59,6 +60,7 @@ export interface InterviewTurnRequest {
 
 export interface InterviewSessionSummary {
   sessionId: string
+  resumeId?: number | null
   mode: InterviewMode
   status: 'active' | 'finished'
   durationMinutes: number
@@ -79,6 +81,7 @@ export interface InterviewSessionMessage {
 
 export interface InterviewSessionDetail {
   sessionId: string
+  resumeId?: number | null
   mode: InterviewMode
   status: 'active' | 'finished'
   durationMinutes: number
