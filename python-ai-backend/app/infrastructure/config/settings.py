@@ -101,6 +101,11 @@ class Settings:
     mysql_datasource_url: str
     mysql_datasource_username: str
     mysql_datasource_password: str
+    auth_secret_key: str
+    auth_cookie_name: str
+    auth_cookie_secure: bool
+    auth_cookie_samesite: str
+    auth_token_expire_hours: int
     pgvector_datasource_url: str
     pgvector_datasource_username: str
     pgvector_datasource_password: str
@@ -191,6 +196,11 @@ def get_settings() -> Settings:
         mysql_datasource_url=os.getenv("MYSQL_DATASOURCE_URL", ""),
         mysql_datasource_username=os.getenv("MYSQL_DATASOURCE_USERNAME", ""),
         mysql_datasource_password=os.getenv("MYSQL_DATASOURCE_PASSWORD", ""),
+        auth_secret_key=_get_first_non_empty("AUTH_SECRET_KEY", default="dev-secret-change-me"),
+        auth_cookie_name=_get_first_non_empty("AUTH_COOKIE_NAME", default="claw_auth"),
+        auth_cookie_secure=os.getenv("AUTH_COOKIE_SECURE", "false").lower() in {"1", "true", "yes", "on"},
+        auth_cookie_samesite=_get_first_non_empty("AUTH_COOKIE_SAMESITE", default="lax"),
+        auth_token_expire_hours=max(1, _get_int("AUTH_TOKEN_EXPIRE_HOURS", 168)),
         pgvector_datasource_url=os.getenv("PGVECTOR_DATASOURCE_URL", ""),
         pgvector_datasource_username=os.getenv("PGVECTOR_DATASOURCE_USERNAME", ""),
         pgvector_datasource_password=os.getenv("PGVECTOR_DATASOURCE_PASSWORD", ""),

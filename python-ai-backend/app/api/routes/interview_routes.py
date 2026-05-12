@@ -1,9 +1,10 @@
 # author: jf
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
+from app.api.deps.auth import get_current_user
 from app.api.mappers.interview_mapper import interview_turn_request_to_dto
 from app.api.schemas.interview import InterviewTurnRequest
 from app.application.use_cases.generate_interview_turn import (
@@ -20,9 +21,9 @@ router = APIRouter(prefix="/api/ai/interview", tags=["ai-interview"])
 
 
 @router.post("/turn/stream")
-def interview_turn_stream(request: InterviewTurnRequest) -> StreamingResponse:
+def interview_turn_stream(request: InterviewTurnRequest, current_user=Depends(get_current_user)) -> StreamingResponse:
     return StreamingResponse(
-        generate_interview_turn_stream_use_case(interview_turn_request_to_dto(request)),
+        generate_interview_turn_stream_use_case(interview_turn_request_to_dto(request, user_id=current_user.id)),
         media_type="application/x-ndjson",
         headers={
             "Cache-Control": "no-cache",
@@ -33,10 +34,11 @@ def interview_turn_stream(request: InterviewTurnRequest) -> StreamingResponse:
 
 
 @router.get("/sessions")
-def list_interview_sessions_route(limit: int = Query(default=20, ge=1, le=200)) -> list[dict[str, Any]]:
-    return list_interview_sessions_use_case(limit)
+def list_interview_sessions_route(limit: int = Query(default=20, ge=1, le=200), current_user=Depends(get_current_user)) -> list[dict[str, Any]]:
+    return list_interview_sessions_use_case(current_user.id, limit)
 
 
 @router.get("/sessions/{session_id}")
-def get_interview_session_detail_route(session_id: str) -> dict[str, Any]:
-    return get_interview_session_detail_use_case(session_id)
+def get_interview_session_detail_route(session_id: str, current_user=Depends(get_current_user)) -> dict[str, Any]:
+    return get_interview_session_detail_use_case(current_user.id, session_id)
+

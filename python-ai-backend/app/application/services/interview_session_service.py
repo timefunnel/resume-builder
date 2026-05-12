@@ -100,9 +100,10 @@ def persist_turn_result(
     meta = graph_output.get("meta") if isinstance(graph_output.get("meta"), dict) else {}
 
     now_iso = _now_iso()
-    session = repository.get(session_id)
+    session = repository.get(request.user_id, session_id)
     if session is None:
         session = _new_session_record(session_id=session_id, request=request, now_iso=now_iso)
+        session["userId"] = request.user_id
     messages = _ensure_messages(session)
 
     user_input = str(request.user_input or "").strip()
@@ -119,7 +120,7 @@ def persist_turn_result(
     if final_evaluation is not None:
         session["finalEvaluation"] = final_evaluation
     session["updatedAt"] = now_iso
-    repository.save(session_id, session)
+    repository.save(request.user_id, session_id, session)
 
     return {
         "assistantReply": assistant_reply,
@@ -168,18 +169,18 @@ def _session_to_detail(session: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def list_interview_sessions(limit: int, repository: InterviewSessionRepository) -> list[dict[str, Any]]:
-    sessions = repository.list(limit)
+def list_interview_sessions(user_id: int, limit: int, repository: InterviewSessionRepository) -> list[dict[str, Any]]:
+    sessions = repository.list(user_id, limit)
     sessions.sort(key=lambda item: str(item.get("updatedAt") or ""), reverse=True)
     return [_session_to_summary(item) for item in sessions[:limit]]
 
 
-def get_interview_session_detail(session_id: str, repository: InterviewSessionRepository) -> dict[str, Any]:
+def get_interview_session_detail(user_id: int, session_id: str, repository: InterviewSessionRepository) -> dict[str, Any]:
     safe_session_id = session_id.strip()
     if not safe_session_id:
         raise HTTPException(status_code=400, detail="sessionId cannot be empty")
 
-    session = repository.get(safe_session_id)
+    session = repository.get(user_id, safe_session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Interview session not found")
     return _session_to_detail(session)

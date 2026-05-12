@@ -20,6 +20,7 @@ from app.infrastructure.llm.openai_embedding_adapter import OpenAIEmbeddingAdapt
 from app.infrastructure.llm.ollama_embedding_adapter import OllamaEmbeddingAdapter
 from app.infrastructure.llm.openai_image_markdown_ocr_adapter import OpenAIImageMarkdownOcrAdapter
 from app.infrastructure.persistence.mysql.session_repository import MySqlInterviewSessionRepository
+from app.infrastructure.persistence.mysql.user_repository import MySqlUserRepository
 from app.infrastructure.persistence.pgvector.vector_store_adapter import PgVectorStoreAdapter
 from app.infrastructure.text.file_parser_adapter import FileParserAdapter
 
@@ -161,6 +162,15 @@ def build_agent_runtime(settings: Settings | None = None) -> AgentRuntimePort:
 def build_interview_session_repository(settings: Settings | None = None) -> InterviewSessionRepository:
     resolved = settings or get_settings()
     return MySqlInterviewSessionRepository(
+        datasource_url=resolved.mysql_datasource_url,
+        username=resolved.mysql_datasource_username,
+        password=resolved.mysql_datasource_password,
+    )
+
+
+def build_user_repository(settings: Settings | None = None) -> MySqlUserRepository:
+    resolved = settings or get_settings()
+    return MySqlUserRepository(
         datasource_url=resolved.mysql_datasource_url,
         username=resolved.mysql_datasource_username,
         password=resolved.mysql_datasource_password,

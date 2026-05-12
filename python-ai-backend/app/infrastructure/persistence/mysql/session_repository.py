@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 # author: jf
 import json
 from collections import defaultdict
@@ -112,7 +110,7 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
             autocommit=False,
         )
 
-    def _message_rows(self, session_id: str, messages: list[dict[str, Any]]) -> list[tuple[Any, ...]]:
+    def _message_rows(self, session_id: str, messages: "list[dict[str, Any]]") -> "list[tuple[Any, ...]]":
         rows: list[tuple[Any, ...]] = []
         for index, message in enumerate(messages, start=1):
             if not isinstance(message, dict):
@@ -144,7 +142,7 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
             )
         return rows
 
-    def save(self, session_id: str, session: dict[str, Any]) -> None:
+    def save(self, user_id: int, session_id: str, session: dict[str, Any]) -> None:
         safe_session_id = _safe_text(session_id)
         if not safe_session_id:
             return
@@ -162,6 +160,7 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
                     """
                     INSERT INTO interview_sessions (
                         session_id,
+                        user_id,
                         mode,
                         status,
                         duration_minutes,
@@ -173,8 +172,9 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
                         passed,
                         created_at,
                         updated_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON DUPLICATE KEY UPDATE
+                        user_id = VALUES(user_id),
                         mode = VALUES(mode),
                         status = VALUES(status),
                         duration_minutes = VALUES(duration_minutes),
@@ -188,6 +188,7 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
                     """,
                     (
                         safe_session_id,
+                        int(user_id),
                         "interviewer" if _safe_text(safe_session.get("mode")).lower() == "interviewer" else "candidate",
                         "finished" if _safe_text(safe_session.get("status")).lower() == "finished" else "active",
                         max(1, int(safe_session.get("durationMinutes") or 60)),
@@ -225,7 +226,7 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
         finally:
             connection.close()
 
-    def list(self, limit: int) -> list[dict[str, Any]]:
+    def list(self, user_id: int, limit: int) -> list[dict[str, Any]]:
         safe_limit = max(1, min(int(limit or 20), 200))
         connection = self._connect()
         try:
@@ -234,6 +235,7 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
                     """
                     SELECT
                         session_id,
+                        user_id,
                         mode,
                         status,
                         duration_minutes,
@@ -244,17 +246,18 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
                         created_at,
                         updated_at
                     FROM interview_sessions
+                    WHERE user_id = %s
                     ORDER BY updated_at DESC
                     LIMIT %s
                     """,
-                    (safe_limit,),
+                    (int(user_id), safe_limit),
                 )
                 session_rows = list(cursor.fetchall())
                 return self._hydrate_sessions(cursor, session_rows)
         finally:
             connection.close()
 
-    def get(self, session_id: str) -> dict[str, Any] | None:
+    def get(self, user_id: int, session_id: str) -> dict[str, Any] | None:
         safe_session_id = _safe_text(session_id)
         if not safe_session_id:
             return None
@@ -266,6 +269,7 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
                     """
                     SELECT
                         session_id,
+                        user_id,
                         mode,
                         status,
                         duration_minutes,
@@ -276,10 +280,10 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
                         created_at,
                         updated_at
                     FROM interview_sessions
-                    WHERE session_id = %s
+                    WHERE session_id = %s AND user_id = %s
                     LIMIT 1
                     """,
-                    (safe_session_id,),
+                    (safe_session_id, int(user_id)),
                 )
                 row = cursor.fetchone()
                 if row is None:
@@ -289,7 +293,7 @@ class MySqlInterviewSessionRepository(InterviewSessionRepository):
         finally:
             connection.close()
 
-    def _hydrate_sessions(self, cursor, session_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def _hydrate_sessions(self, cursor, session_rows: "list[dict[str, Any]]") -> "list[dict[str, Any]]":
         if not session_rows:
             return []
 
