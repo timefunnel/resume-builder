@@ -25,6 +25,8 @@ const draggingModuleKey = ref<string | null>(null)
 const dragOverModuleKey = ref<string | null>(null)
 const nowTick = ref(Date.now())
 const resumeTitleDraft = ref('')
+const resumeTitleInputRef = ref<HTMLInputElement | null>(null)
+const titleDirty = ref(false)
 
 function handleAiClick() {
   showAiPanel.value = true
@@ -173,6 +175,8 @@ async function handleCreateResume() {
   try {
     const created = await store.createNewResume('新的简历')
     resumeTitleDraft.value = created?.title || '新的简历'
+    titleDirty.value = false
+    requestAnimationFrame(() => resumeTitleInputRef.value?.focus())
   } catch (error) {
     console.warn('Failed to create resume', error)
   }
@@ -180,9 +184,12 @@ async function handleCreateResume() {
 
 async function handleDeleteResume() {
   if (!hasCloudResume.value) return
+  const confirmed = window.confirm(`确定删除简历《${resumeTitleDraft.value || store.currentResumeTitle}》吗？此操作不可撤销。`)
+  if (!confirmed) return
   try {
     await store.deleteCurrentResume()
     resumeTitleDraft.value = store.currentResumeTitle
+    titleDirty.value = false
   } catch (error) {
     console.warn('Failed to delete resume', error)
   }
@@ -315,9 +322,14 @@ watch(
   () => store.currentResumeTitle,
   (value) => {
     resumeTitleDraft.value = value || ''
+    titleDirty.value = false
   },
   { immediate: true }
 )
+
+watch(resumeTitleDraft, (value) => {
+  titleDirty.value = value.trim() !== (store.currentResumeTitle || '').trim()
+})
 
 watch(
   () => [
