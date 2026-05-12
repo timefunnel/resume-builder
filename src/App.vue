@@ -1,6 +1,6 @@
 <!-- author: jf -->
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useResumeStore } from '@/stores/resume'
 import KnowledgeBasePanel from '@/components/ai/knowledge/KnowledgeBasePanel.vue'
@@ -26,6 +26,7 @@ const activeMenu = ref<PrimaryMenuKey>(
   typeof window === 'undefined' ? DEFAULT_PRIMARY_MENU_KEY : resolvePrimaryMenuFromPath(window.location.pathname)
 )
 const activeResumePane = ref<ResumeMobilePane>('editor')
+const currentUserLabel = computed(() => authStore.user?.nickname?.trim() || authStore.user?.email || '')
 type ThemeMode = 'light' | 'dark'
 const THEME_STORAGE_KEY = 'resume-builder-theme'
 const themeMode = ref<ThemeMode>(resolveInitialThemeMode())
@@ -125,6 +126,8 @@ onUnmounted(() => {
     <ModuleSidebar
       :collapsed="sidebarCollapsed"
       :active-menu="activeMenu"
+      :logged-in="authStore.isLoggedIn"
+      :user-label="currentUserLabel"
       @toggle-collapse="sidebarCollapsed = !sidebarCollapsed"
       @select-menu="handleSelectMenu"
     />

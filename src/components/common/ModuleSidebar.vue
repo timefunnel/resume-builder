@@ -6,10 +6,14 @@ const props = withDefaults(
   defineProps<{
     collapsed?: boolean
     activeMenu?: PrimaryMenuKey
+    userLabel?: string
+    loggedIn?: boolean
   }>(),
   {
     collapsed: false,
     activeMenu: 'resume-editor',
+    userLabel: '',
+    loggedIn: false,
   }
 )
 
@@ -75,6 +79,14 @@ function handleMenuClick(event: MouseEvent, key: PrimaryMenuKey) {
         >
           {{ props.collapsed ? '>' : '<' }}
         </button>
+      </div>
+    </div>
+
+    <div class="account-badge" :class="{ online: props.loggedIn }">
+      <span class="account-badge-dot" aria-hidden="true"></span>
+      <div class="account-badge-copy">
+        <strong>{{ props.loggedIn ? '已登录' : '未登录' }}</strong>
+        <span>{{ props.userLabel || (props.loggedIn ? '当前账户' : '云端功能将受限') }}</span>
       </div>
     </div>
 
@@ -431,4 +443,13 @@ function handleMenuClick(event: MouseEvent, key: PrimaryMenuKey) {
     text-overflow: ellipsis;
   }
 }
+</style>
+
+<style scoped>
+.account-badge { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:12px; background:#f8f3ed; border:1px solid #e3d6c7; }
+.account-badge-dot { width:10px; height:10px; border-radius:999px; background:#b0a08f; flex-shrink:0; }
+.account-badge.online .account-badge-dot { background:#16a34a; box-shadow:0 0 0 4px rgba(22,163,74,.12); }
+.account-badge-copy { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.account-badge-copy strong { font-size:12px; color:#2d2521; }
+.account-badge-copy span { font-size:11px; color:#8a7461; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 </style>

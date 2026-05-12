@@ -193,6 +193,16 @@ const autoSaveChipText = computed(() => {
   return `${Math.floor(elapsedMs / 60_000)}分钟前${label}`
 })
 
+
+const cloudStatusText = computed(() => {
+  if (!authStore.isLoggedIn) return '未登录：当前仅保证本地草稿保存'
+  if (store.isSaving) return '云端同步中...'
+  if (store.cloudUpdatedAt) return `云端已同步 · ${store.cloudUpdatedAt}`
+  return '已登录：将同步到云端'
+})
+
+const authHintText = computed(() => authStore.isLoggedIn ? `当前账号：${authStore.user?.nickname || authStore.user?.email || ''}` : '登录后可跨设备同步简历草稿')
+
 const isDefaultOrder = computed(() => store.isDefaultModuleOrder())
 
 function handleResetOrder() {
