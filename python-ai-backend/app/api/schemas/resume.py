@@ -8,6 +8,17 @@ class ResumeSaveRequest(BaseModel):
     content: dict[str, Any] = Field(default_factory=dict)
 
 
+class ResumeCreateRequest(BaseModel):
+    title: str = Field(default='新的简历', max_length=255)
+    content: dict[str, Any] = Field(default_factory=dict)
+
+
+class ResumeSummaryResponse(BaseModel):
+    id: int
+    title: str
+    updatedAt: str | None = None
+
+
 class ResumeResponse(BaseModel):
     id: int | None = None
     title: str = '我的简历'

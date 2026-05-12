@@ -24,6 +24,7 @@ const jsonImportInputRef = ref<HTMLInputElement | null>(null)
 const draggingModuleKey = ref<string | null>(null)
 const dragOverModuleKey = ref<string | null>(null)
 const nowTick = ref(Date.now())
+const resumeTitleDraft = ref('')
 
 function handleAiClick() {
   showAiPanel.value = true
@@ -143,7 +144,8 @@ async function handleSave() {
   store.saveToStorage()
   if (authStore.isLoggedIn) {
     try {
-      await store.saveToCloud()
+      await store.saveToCloud(resumeTitleDraft.value || store.currentResumeTitle)
+      await store.fetchResumeList().catch(() => undefined)
     } catch (error) {
       console.warn('Failed to save resume to cloud', error)
     }
@@ -152,6 +154,38 @@ async function handleSave() {
   setTimeout(() => {
     showSaved.value = false
   }, 1800)
+}
+
+
+async function handleSwitchResume(event: Event) {
+  const target = event.target as HTMLSelectElement
+  const id = Number(target.value)
+  if (!Number.isFinite(id) || id <= 0) return
+  try {
+    await store.loadResumeById(id)
+    resumeTitleDraft.value = store.currentResumeTitle
+  } catch (error) {
+    console.warn('Failed to switch resume', error)
+  }
+}
+
+async function handleCreateResume() {
+  try {
+    const created = await store.createNewResume('新的简历')
+    resumeTitleDraft.value = created?.title || '新的简历'
+  } catch (error) {
+    console.warn('Failed to create resume', error)
+  }
+}
+
+async function handleDeleteResume() {
+  if (!hasCloudResume.value) return
+  try {
+    await store.deleteCurrentResume()
+    resumeTitleDraft.value = store.currentResumeTitle
+  } catch (error) {
+    console.warn('Failed to delete resume', error)
+  }
 }
 
 function triggerJsonImport() {
@@ -204,6 +238,7 @@ const cloudStatusText = computed(() => {
 const authHintText = computed(() => authStore.isLoggedIn ? `当前账号：${authStore.user?.nickname || authStore.user?.email || ''}` : '登录后可跨设备同步简历草稿')
 
 const isDefaultOrder = computed(() => store.isDefaultModuleOrder())
+const hasCloudResume = computed(() => typeof store.cloudResumeId === 'number')
 
 function handleResetOrder() {
   store.resetModuleOrder()
@@ -275,6 +310,14 @@ onMounted(() => {
   document.addEventListener('mousedown', handleDocumentPointerDown)
 })
 
+
+watch(
+  () => store.currentResumeTitle,
+  (value) => {
+    resumeTitleDraft.value = value || ''
+  },
+  { immediate: true }
+)
 
 watch(
   () => [
