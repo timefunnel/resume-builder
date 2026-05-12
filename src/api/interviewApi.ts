@@ -10,7 +10,7 @@ export function getInterviewSessionsEndpoint(limit?: number, resumeId?: number |
   const params = new URLSearchParams()
   if (typeof limit === 'number' && Number.isFinite(limit)) params.set('limit', String(Math.max(1, Math.floor(limit))))
   if (typeof resumeId === 'number' && Number.isFinite(resumeId) && resumeId > 0) params.set('resumeId', String(Math.floor(resumeId)))
-  const query = params.toString() ? `?${params.toString()}` : 
+  const query = params.toString() ? `?${params.toString()}` : ''
   return `${API_BASE_PATH}/ai/interview/sessions${query}`
 }
 

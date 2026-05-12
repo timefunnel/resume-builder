@@ -512,6 +512,22 @@ function resolveResumeTitle(resumeId?: number | null): string {
   return item?.title || `简历 #${resumeId}`
 }
 
+
+const historyScopeDescription = computed(() => {
+  if (historyScope.value === 'all') return '当前显示该账号下的全部面试会话'
+  if (!resumeStore.cloudResumeId) return '当前未选中云端简历，因此无法按简历筛选'
+  return `当前只显示简历《${resolveResumeTitle(resumeStore.cloudResumeId)}》关联的面试会话`
+})
+
+const historyEmptyText = computed(() => {
+  if (loadingSessionHistory.value) return '正在加载会话历史…'
+  if (historyScope.value === 'current-resume') {
+    if (!resumeStore.cloudResumeId) return '请先选择一份云端简历，再查看该简历相关面试历史。'
+    return '当前这份简历还没有面试记录，开始一场新面试后会出现在这里。'
+  }
+  return '当前账号下还没有任何面试记录。'
+})
+
 const currentResumeContextText = computed(() => {
   if (!resumeStore.cloudResumeId) return '当前未选择云端简历'
   return `当前关联简历：${resolveResumeTitle(resumeStore.cloudResumeId)}`
@@ -1100,6 +1116,9 @@ onUnmounted(() => {
   opacity: 0.65;
 }
 
+.history-scope-meta { display:flex; align-items:center; margin-right:10px; }
+.history-scope-description { margin:0; font-size:12px; font-weight:700; color:#7b6a5b; }
+.history-empty-tip { margin:10px 0 0; padding:10px 12px; border-radius:12px; background:#fff7ef; color:#7b6a5b; font-size:12px; font-weight:700; line-height:1.5; }
 .history-scope-toggle { display:inline-flex; gap:6px; margin-right:8px; }
 .history-scope-btn { height:30px; padding:0 10px; border-radius:999px; border:1px solid #dfd2c2; background:#fff; color:#7b6a5b; font-size:12px; font-weight:800; }
 .history-scope-btn.active { background:#2d2521; border-color:#2d2521; color:#fff; }
@@ -1478,7 +1497,10 @@ onUnmounted(() => {
     padding: 0 7px;
   }
 
-  .history-scope-toggle { display:inline-flex; gap:6px; margin-right:8px; }
+  .history-scope-meta { display:flex; align-items:center; margin-right:10px; }
+.history-scope-description { margin:0; font-size:12px; font-weight:700; color:#7b6a5b; }
+.history-empty-tip { margin:10px 0 0; padding:10px 12px; border-radius:12px; background:#fff7ef; color:#7b6a5b; font-size:12px; font-weight:700; line-height:1.5; }
+.history-scope-toggle { display:inline-flex; gap:6px; margin-right:8px; }
 .history-scope-btn { height:30px; padding:0 10px; border-radius:999px; border:1px solid #dfd2c2; background:#fff; color:#7b6a5b; font-size:12px; font-weight:800; }
 .history-scope-btn.active { background:#2d2521; border-color:#2d2521; color:#fff; }
 .history-refresh-btn {
