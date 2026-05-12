@@ -30,6 +30,7 @@ const resumeTitleInputRef = ref<HTMLInputElement | null>(null)
 const titleDirty = ref(false)
 const aiImportInputRef = ref<HTMLInputElement | null>(null)
 const aiImporting = ref(false)
+const aiImportedDraft = ref<{ title: string; content: Record<string, unknown>; extractedText: string } | null>(null)
 
 function handleAiClick() {
   showAiPanel.value = true
@@ -217,9 +218,10 @@ async function handleAiImport(event: Event) {
       throw new Error(String(payload?.detail || `AI 导入失败 (${response.status})`))
     }
     if (payload?.content) {
-      store.importResumeData(JSON.stringify(payload.content))
-      if (typeof payload.title === 'string' && payload.title.trim()) {
-        resumeTitleDraft.value = payload.title.trim()
+      aiImportedDraft.value = {
+        title: typeof payload.title === 'string' && payload.title.trim() ? payload.title.trim() : '导入的简历',
+        content: payload.content,
+        extractedText: typeof payload.extractedText === 'string' ? payload.extractedText : '',
       }
     }
   } catch (error) {
@@ -227,6 +229,31 @@ async function handleAiImport(event: Event) {
   } finally {
     aiImporting.value = false
   }
+}
+
+
+function applyImportedDraftToCurrent() {
+  if (!aiImportedDraft.value) return
+  store.importResumeData(JSON.stringify(aiImportedDraft.value.content))
+  resumeTitleDraft.value = aiImportedDraft.value.title
+  aiImportedDraft.value = null
+}
+
+async function saveImportedDraftAsNewResume() {
+  if (!aiImportedDraft.value) return
+  try {
+    const created = await store.createNewResume(aiImportedDraft.value.title || '导入的简历')
+    store.importResumeData(JSON.stringify(aiImportedDraft.value.content))
+    resumeTitleDraft.value = aiImportedDraft.value.title || created?.title || '导入的简历'
+    await store.saveToCloud(resumeTitleDraft.value)
+    aiImportedDraft.value = null
+  } catch (error) {
+    console.warn('Failed to save imported draft as new resume', error)
+  }
+}
+
+function dismissImportedDraft() {
+  aiImportedDraft.value = null
 }
 
 function triggerJsonImport() {
@@ -564,6 +591,18 @@ onUnmounted(() => {
         <p v-if="showSaved" class="save-hint">已保存</p>
       </transition>
 
+      <div v-if="aiImportedDraft" class="ai-import-result">
+        <div class="ai-import-result-copy">
+          <strong>AI 已完成简历解析：{{ aiImportedDraft.title }}</strong>
+          <p>你可以先应用到当前编辑中的简历，或者直接另存为一份新简历。</p>
+        </div>
+        <div class="ai-import-result-actions">
+          <button class="btn-import" type="button" @click="applyImportedDraftToCurrent">应用到当前简历</button>
+          <button class="btn-save" type="button" @click="saveImportedDraftAsNewResume">另存为新简历</button>
+          <button class="panel-action subtle" type="button" @click="dismissImportedDraft">取消</button>
+        </div>
+      </div>
+
       <div class="module-sections">
         <article
           v-for="mod in filteredModules"
@@ -604,3 +643,9 @@ onUnmounted(() => {
 
 <style scoped src="./EditorPanel.css"></style>
 <style scoped src="./EditorPanel.responsive.css"></style>
+<style scoped>
+.ai-import-result { margin: 14px 0 0; padding: 14px 16px; border: 1px solid #e7d8c8; border-radius: 16px; background: #fff8f1; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.ai-import-result-copy strong { display:block; margin-bottom: 4px; color:#2d2521; }
+.ai-import-result-copy p { margin:0; color:#7b6a5b; font-size:12px; line-height:1.6; }
+.ai-import-result-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+</style>
