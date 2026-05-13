@@ -17,10 +17,10 @@ router = APIRouter(prefix='/api/ai/audio/transcriptions', tags=['ai-audio-transc
 def _build_audio_transcriber() -> OpenAIAudioTranscriptionAdapter:
     settings = resolve_settings()
     return OpenAIAudioTranscriptionAdapter(
-        api_key=settings.openai_api_key,
-        model_name=os.getenv('OPENAI_AUDIO_TRANSCRIPTION_MODEL', 'FunAudioLLM/SenseVoiceSmall'),
-        base_url='https://api.siliconflow.cn/v1/audio/transcriptions',
-        timeout_seconds=max(3.0, float(os.getenv('OPENAI_AUDIO_TRANSCRIPTION_TIMEOUT_SECONDS', '60'))),
+        api_key=settings.openai_audio_transcription_api_key,
+        model_name=settings.openai_audio_transcription_model,
+        base_url=settings.openai_audio_transcription_base_url,
+        timeout_seconds=settings.openai_audio_transcription_timeout_seconds,
     )
 
 

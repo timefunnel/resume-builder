@@ -84,6 +84,10 @@ class Settings:
     openai_embedding_api_key: str
     openai_embedding_model: str
     openai_embedding_timeout_seconds: float
+    openai_audio_transcription_base_url: str
+    openai_audio_transcription_api_key: str
+    openai_audio_transcription_model: str
+    openai_audio_transcription_timeout_seconds: float
     ollama_embedding_base_url: str
     ollama_embedding_model: str
     ollama_embedding_timeout_seconds: float
@@ -179,6 +183,10 @@ def get_settings() -> Settings:
         openai_embedding_api_key=openai_embedding_api_key,
         openai_embedding_model=openai_embedding_model,
         openai_embedding_timeout_seconds=openai_embedding_timeout_seconds,
+        openai_audio_transcription_base_url=_get_first_non_empty('OPENAI_AUDIO_TRANSCRIPTION_BASE_URL', default='https://api.siliconflow.cn/v1/audio/transcriptions'),
+        openai_audio_transcription_api_key=_get_first_non_empty('OPENAI_AUDIO_TRANSCRIPTION_API_KEY', 'OPENAI_CHAT_API_KEY', 'OPENAI_API_KEY', default=openai_api_key),
+        openai_audio_transcription_model=os.getenv('OPENAI_AUDIO_TRANSCRIPTION_MODEL', 'FunAudioLLM/SenseVoiceSmall'),
+        openai_audio_transcription_timeout_seconds=max(3.0, _get_float('OPENAI_AUDIO_TRANSCRIPTION_TIMEOUT_SECONDS', 60.0)),
         ollama_embedding_base_url=ollama_embedding_base_url,
         ollama_embedding_model=ollama_embedding_model,
         ollama_embedding_timeout_seconds=ollama_embedding_timeout_seconds,
