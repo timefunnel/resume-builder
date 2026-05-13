@@ -27,6 +27,7 @@ const dragOverModuleKey = ref<string | null>(null)
 const nowTick = ref(Date.now())
 const resumeTitleDraft = ref('')
 const resumeTitleInputRef = ref<HTMLInputElement | null>(null)
+const isEditingResumeTitle = ref(false)
 const titleDirty = ref(false)
 const aiImportInputRef = ref<HTMLInputElement | null>(null)
 const aiImporting = ref(false)
@@ -213,10 +214,39 @@ async function handleCreateResume() {
     const created = await store.createNewResume(requestedTitle)
     resumeTitleDraft.value = created?.title || '新的简历'
     titleDirty.value = false
+    isEditingResumeTitle.value = false
     newResumeNameDraft.value = ''
     requestAnimationFrame(() => resumeTitleInputRef.value?.focus())
   } catch (error) {
     console.warn('Failed to create resume', error)
+  }
+}
+
+
+function startRenameResume() {
+  if (!hasCloudResume.value || store.operationState !== 'idle') return
+  resumeTitleDraft.value = store.currentResumeTitle || ''
+  isEditingResumeTitle.value = true
+  titleDirty.value = false
+  requestAnimationFrame(() => resumeTitleInputRef.value?.focus())
+}
+
+function cancelRenameResume() {
+  resumeTitleDraft.value = store.currentResumeTitle || ''
+  titleDirty.value = false
+  isEditingResumeTitle.value = false
+}
+
+async function handleRenameResume(itemId?: number) {
+  const targetId = itemId || store.cloudResumeId
+  const nextTitle = resumeTitleDraft.value.trim()
+  if (!targetId || !nextTitle || !titleDirty.value) return
+  try {
+    await store.renameResumeById(targetId, nextTitle)
+    titleDirty.value = false
+    isEditingResumeTitle.value = false
+  } catch (error) {
+    console.warn('Failed to rename resume', error)
   }
 }
 
@@ -228,6 +258,7 @@ async function handleDeleteResume() {
     await store.deleteCurrentResume()
     resumeTitleDraft.value = store.currentResumeTitle
     titleDirty.value = false
+    isEditingResumeTitle.value = false
   } catch (error) {
     console.warn('Failed to delete resume', error)
   }
@@ -430,8 +461,10 @@ onMounted(() => {
 watch(
   () => store.currentResumeTitle,
   (value) => {
-    resumeTitleDraft.value = value || ''
-    titleDirty.value = false
+    if (!isEditingResumeTitle.value) {
+      resumeTitleDraft.value = value || ''
+      titleDirty.value = false
+    }
   },
   { immediate: true }
 )
@@ -440,26 +473,6 @@ watch(resumeTitleDraft, (value) => {
   titleDirty.value = value.trim() !== (store.currentResumeTitle || '').trim()
 })
 
-watch(
-  () => [
-    JSON.stringify(store.basicInfo),
-    JSON.stringify(store.educationList),
-    store.skills,
-    JSON.stringify(store.workList),
-    JSON.stringify(store.projectList),
-    JSON.stringify(store.awardList),
-    store.selfIntro,
-    store.selectedTemplateKey,
-    JSON.stringify(store.modules),
-    authStore.isLoggedIn,
-  ],
-  () => {
-    if (authStore.isLoggedIn) {
-      store.scheduleCloudSave('我的简历')
-    }
-  },
-  { deep: false }
-)
 
 onUnmounted(() => {
   if (autoSaveTicker) {
@@ -606,8 +619,9 @@ onUnmounted(() => {
           <p class="resume-library-subtitle">这里会显示你当前账号下的云端简历，可直接切换、创建和删除。</p>
         </div>
         <div class="resume-library-actions">
-          <button class="btn-import" type="button" @click="handleCreateResume">新建简历</button>
-          <button class="btn-save" type="button" :disabled="!hasCloudResume" @click="handleSave">保存当前简历</button>
+          <input v-model.trim="newResumeNameDraft" class="resume-new-input" type="text" maxlength="255" placeholder="输入新简历名称" />
+          <button class="btn-import" type="button" :disabled="store.operationState !== 'idle'" @click="handleCreateResume">新建简历</button>
+          <button class="btn-save" type="button" :disabled="!hasCloudResume || store.operationState !== 'idle'" @click="handleSave">保存当前简历</button>
         </div>
       </div>
 
@@ -629,15 +643,110 @@ onUnmounted(() => {
             <strong>{{ item.title }}</strong>
             <span>{{ item.updatedAt || '暂无更新时间' }}</span>
           </div>
-          <span v-if="store.cloudResumeId === item.id" class="resume-library-current">当前</span>
+          <div class="resume-library-item-actions">
+            <button class="resume-inline-action danger" type="button" :disabled="store.operationState !== 'idle'" @click.stop="store.cloudResumeId = item.id; resumeTitleDraft = item.title; handleDeleteResume()">删除</button>
+            <span v-if="store.cloudResumeId === item.id" class="resume-library-current">当前</span>
+          </div>
         </button>
       </div>
+    </section>
+
+    <section class="mobile-module-panel">
+      <div class="mobile-module-panel-header">
+        <div>
+          <h3 class="mobile-module-panel-title">功能菜单</h3>
+          <p class="mobile-module-panel-subtitle">这里可以切换显示模块、调整顺序。</p>
+        </div>
+        <button
+          class="btn-reset-order-icon"
+          type="button"
+          :disabled="isDefaultOrder"
+          aria-label="恢复默认顺序"
+          title="恢复默认顺序"
+          @click="handleResetOrder"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 11a8 8 0 1 1-2.34-5.66" />
+            <path d="M20 4v7h-7" />
+          </svg>
+        </button>
+      </div>
+      <ul class="module-switch-list mobile-module-switch-list">
+        <li
+          v-for="mod in store.modules"
+          :key="`mobile-switch-${mod.key}`"
+          class="module-switch-item"
+          :class="{
+            active: mod.visible,
+            muted: !mod.visible,
+            draggable: mod.key !== 'basicInfo',
+            dragging: draggingModuleKey === mod.key,
+            'drag-over': dragOverModuleKey === mod.key,
+          }"
+          :draggable="mod.key !== 'basicInfo'"
+          @dragstart="handleSwitchDragStart($event, mod.key)"
+          @dragover="handleSwitchDragOver($event, mod.key)"
+          @drop.prevent="handleSwitchDrop(mod.key)"
+          @dragend="handleSwitchDragEnd"
+        >
+          <div class="module-switch-info">
+            <span v-if="mod.key !== 'basicInfo'" class="drag-handle" aria-hidden="true" title="拖拽排序">⋮⋮</span>
+            <span class="module-switch-icon" aria-hidden="true">
+              <svg class="module-switch-icon-svg" :viewBox="MODULE_ICON_VIEWBOX">
+                <path v-for="(d, idx) in moduleIconPaths(mod.key)" :key="`mobile-switch-${mod.key}-${idx}`" :d="d" />
+              </svg>
+            </span>
+            <span class="module-switch-label">{{ mod.label }}</span>
+          </div>
+
+          <div class="module-switch-actions">
+            <div v-if="mod.key !== 'basicInfo' && mod.visible" class="order-actions order-actions-switch">
+              <button class="order-btn" :disabled="!canMoveUp(mod.key)" @click.stop="moveUp(mod.key)">↑</button>
+              <button class="order-btn" :disabled="!canMoveDown(mod.key)" @click.stop="moveDown(mod.key)">↓</button>
+            </div>
+            <label class="toggle-switch">
+              <input
+                type="checkbox"
+                :checked="mod.visible"
+                :aria-label="`${mod.label}开关`"
+                @change="store.toggleModule(mod.key)"
+              />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </li>
+      </ul>
     </section>
 
     <section class="info-editor">
       <div class="info-editor-header">
         <div class="editor-title-row">
-          <h2 class="editor-title">信息编辑区</h2>
+          <div class="editor-title-group">
+            <div v-if="isEditingResumeTitle" class="resume-title-editing">
+              <input
+                ref="resumeTitleInputRef"
+                v-model.trim="resumeTitleDraft"
+                class="resume-title-input"
+                type="text"
+                maxlength="255"
+                placeholder="请输入简历名称"
+                @keydown.enter.prevent="handleRenameResume()"
+                @keydown.esc.prevent="cancelRenameResume"
+              />
+              <button class="title-icon-btn success" type="button" :disabled="!titleDirty || store.operationState !== 'idle'" aria-label="保存简历名称" title="保存简历名称" @click="handleRenameResume()">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>
+              </button>
+              <button class="title-icon-btn" type="button" :disabled="store.operationState !== 'idle'" aria-label="取消重命名" title="取消重命名" @click="cancelRenameResume">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+              </button>
+            </div>
+            <div v-else class="resume-title-display">
+              <h2 class="editor-title">{{ store.currentResumeTitle || '信息编辑区' }}</h2>
+              <button class="title-icon-btn" type="button" :disabled="!hasCloudResume || store.operationState !== 'idle'" aria-label="编辑简历名称" title="编辑简历名称" @click="startRenameResume">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4Z" /></svg>
+              </button>
+            </div>
+          </div>
           <span class="storage-tip-wrap">
             <button
               class="storage-tip-trigger"
@@ -748,6 +857,20 @@ onUnmounted(() => {
 <style scoped src="./EditorPanel.css"></style>
 <style scoped src="./EditorPanel.responsive.css"></style>
 <style scoped>
+
+.editor-title-group { display:flex; align-items:center; gap:10px; min-width:0; }
+.resume-title-display { display:flex; align-items:center; gap:10px; min-width:0; }
+.resume-title-editing { display:flex; align-items:center; gap:8px; min-width:0; }
+.resume-title-input { height:40px; min-width:220px; max-width:360px; border-radius:12px; border:1px solid #dfd2c2; background:#fff; padding:0 12px; font-size:18px; font-weight:800; color:#2d2521; }
+.title-icon-btn { width:34px; height:34px; display:inline-flex; align-items:center; justify-content:center; border-radius:999px; border:1px solid #dfd2c2; background:#fff; color:#7b6a5b; padding:0; }
+.title-icon-btn svg { width:16px; height:16px; stroke:currentColor; stroke-width:2; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+.title-icon-btn.success { color:#117a37; border-color:#b7dfc2; background:#f3fcf6; }
+.title-icon-btn:disabled { opacity:.55; cursor:not-allowed; }
+.mobile-module-panel { display:none; margin-bottom: 12px; padding: 14px; border: 1px solid #e7d8c8; border-radius: 16px; background:#fffaf5; }
+.mobile-module-panel-header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+.mobile-module-panel-title { margin:0; font-size:16px; color:#2d2521; }
+.mobile-module-panel-subtitle { margin:4px 0 0; color:#7b6a5b; font-size:12px; line-height:1.5; }
+.mobile-module-switch-list { max-height:none; }
 .resume-library-panel { margin-bottom: 14px; padding: 16px; border: 1px solid #e7d8c8; border-radius: 18px; background: #fffaf5; }
 .resume-library-header { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom: 12px; }
 .resume-library-title { margin:0; font-size:18px; color:#2d2521; }
@@ -757,6 +880,9 @@ onUnmounted(() => {
 .resume-library-empty { padding:12px 14px; border-radius:12px; background:#fff; color:#7b6a5b; font-size:12px; font-weight:700; }
 .resume-library-list { display:flex; flex-direction:column; gap:8px; }
 .resume-library-item { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; padding:12px 14px; border-radius:14px; border:1px solid #e7d8c8; background:#fff; text-align:left; }
+.resume-library-item-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.resume-inline-action { height:28px; padding:0 10px; border-radius:999px; border:1px solid #dfd2c2; background:#fff; color:#7b6a5b; font-size:11px; font-weight:800; }
+.resume-inline-action.danger { color:#b42318; }
 .resume-library-item.active { border-color:#2d2521; box-shadow:0 0 0 3px rgba(45,37,33,.08); background:#fffdf9; }
 .resume-library-item.disabled { opacity:.65; cursor:not-allowed; }
 .resume-library-item-main { display:flex; flex-direction:column; gap:4px; min-width:0; }

@@ -82,14 +82,6 @@ function handleMenuClick(event: MouseEvent, key: PrimaryMenuKey) {
       </div>
     </div>
 
-    <div class="account-badge" :class="{ online: props.loggedIn }">
-      <span class="account-badge-dot" aria-hidden="true"></span>
-      <div class="account-badge-copy">
-        <strong>{{ props.loggedIn ? '已登录' : '未登录' }}</strong>
-        <span>{{ props.userLabel || (props.loggedIn ? '当前账户' : '云端功能将受限') }}</span>
-      </div>
-    </div>
-
     <p class="menu-caption">功能菜单</p>
 
     <ul class="primary-menu-list">
@@ -370,6 +362,7 @@ function handleMenuClick(event: MouseEvent, key: PrimaryMenuKey) {
 }
 
 @media (max-width: 760px) {
+  .account-badge { display: none; }
   .sidebar,
   .sidebar.collapsed {
     position: fixed;

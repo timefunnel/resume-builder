@@ -61,10 +61,41 @@ export const useResumeStore = defineStore('resume', () => {
   let saveTimer: ReturnType<typeof setTimeout> | null = null
   let cloudSaveTimer: ReturnType<typeof setTimeout> | null = null
   let activeStorageKey = STORAGE_KEY_BASE
+  const lastHydratedFingerprint = ref('')
 
   function updateStorageKey(userId?: number | null) { activeStorageKey = userId ? `${STORAGE_KEY_BASE}:user:${userId}` : STORAGE_KEY_BASE }
+  function clearLocalResumeState(removeAllUserDrafts = false) {
+    if (saveTimer) { clearTimeout(saveTimer); saveTimer = null }
+    if (cloudSaveTimer) { clearTimeout(cloudSaveTimer); cloudSaveTimer = null }
+    nextAutoSaveAt.value = null
+    lastSavedAt.value = null
+    lastSaveMode.value = null
+    isSaving.value = false
+    cloudResumeId.value = null
+    cloudUpdatedAt.value = null
+    resumeList.value = []
+    currentResumeTitle.value = '我的简历'
+    currentResumeLoaded.value = false
+    operationState.value = 'idle'
+    lastHydratedFingerprint.value = ''
+    resetResumeState()
+    try {
+      localStorage.removeItem(activeStorageKey)
+      if (removeAllUserDrafts) {
+        const keys: string[] = []
+        for (let i = 0; i < localStorage.length; i += 1) {
+          const key = localStorage.key(i)
+          if (key && (key === STORAGE_KEY_BASE || key.startsWith(`${STORAGE_KEY_BASE}:user:`))) keys.push(key)
+        }
+        keys.forEach((key) => localStorage.removeItem(key))
+      }
+    } catch (error) {
+      console.warn('Failed to clear local resume storage', error)
+    }
+  }
   function markSavingState() { isSaving.value = true; if (saveLoadingTimer) clearTimeout(saveLoadingTimer); saveLoadingTimer = setTimeout(() => { isSaving.value = false; saveLoadingTimer = null }, SAVE_LOADING_MIN_MS) }
   function snapshotResumeData() { return { modules: modules.map((m) => ({ ...m })), selectedTemplateKey: selectedTemplateKey.value, basicInfo: { ...basicInfo }, educationList: educationList.map((e) => ({ ...e })), skills: skills.value, workList: workList.map((w) => ({ ...w })), projectList: projectList.map((p) => ({ ...p })), awardList: awardList.map((a) => ({ ...a })), selfIntro: selfIntro.value } }
+  function fingerprintResumeData() { return JSON.stringify(snapshotResumeData()) }
   function resetResumeState() {
     modules.splice(0, modules.length,
       { key: 'basicInfo', label: '基本信息', icon: '👤', visible: true },
@@ -106,9 +137,9 @@ export const useResumeStore = defineStore('resume', () => {
     if (data.selfIntro !== undefined) selfIntro.value = data.selfIntro
   }
   function exportResumeData(): string { return JSON.stringify(snapshotResumeData(), null, 2) }
-  function saveToStorage(mode: 'auto'|'manual'='manual') { if (mode === 'manual' && saveTimer) { clearTimeout(saveTimer); saveTimer = null }; markSavingState(); localStorage.setItem(activeStorageKey, JSON.stringify(snapshotResumeData())); nextAutoSaveAt.value = null; lastSavedAt.value = Date.now(); lastSaveMode.value = mode }
-  function loadFromStorage() { const raw = localStorage.getItem(activeStorageKey); if (!raw) return; try { applyResumeData(JSON.parse(raw)) } catch (e) { console.warn('Failed to load resume data from localStorage', e) } }
-  function importResumeData(raw: string) { const data = JSON.parse(raw); localStorage.setItem(activeStorageKey, JSON.stringify(data)); applyResumeData(data); saveToStorage('manual') }
+  function saveToStorage(mode: 'auto'|'manual'='manual', silent = false) { if (mode === 'manual' && saveTimer) { clearTimeout(saveTimer); saveTimer = null }; if (!silent) markSavingState(); localStorage.setItem(activeStorageKey, JSON.stringify(snapshotResumeData())); nextAutoSaveAt.value = null; if (!silent) { lastSavedAt.value = Date.now(); lastSaveMode.value = mode } }
+  function loadFromStorage() { const raw = localStorage.getItem(activeStorageKey); if (!raw) return; try { const parsed = JSON.parse(raw); applyResumeData(parsed); lastHydratedFingerprint.value = JSON.stringify(parsed) } catch (e) { console.warn('Failed to load resume data from localStorage', e) } }
+  function importResumeData(raw: string) { const data = JSON.parse(raw); localStorage.setItem(activeStorageKey, JSON.stringify(data)); applyResumeData(data); lastHydratedFingerprint.value = JSON.stringify(data); saveToStorage('manual') }
   async function fetchResumeList() { const response = await listResumes(); if (!response.ok) throw new Error(`简历列表加载失败 (${response.status})`); resumeList.value = await response.json().catch(() => []); return resumeList.value }
   async function saveToCloud(title = currentResumeTitle.value || '我的简历') {
     if (operationState.value in {loading:1, creating:1, switching:1, deleting:1}) return null as any
@@ -129,9 +160,36 @@ export const useResumeStore = defineStore('resume', () => {
     }
   }
   function scheduleCloudSave(title = currentResumeTitle.value || '我的简历') { if (operationState.value !== 'idle' || !currentResumeLoaded.value || !cloudResumeId.value) return; if (cloudSaveTimer) clearTimeout(cloudSaveTimer); cloudSaveTimer = setTimeout(() => { if (operationState.value !== 'idle' || !currentResumeLoaded.value || !cloudResumeId.value) return; cloudSaveTimer = null; saveToCloud(title).catch((error) => console.warn('Failed to autosave resume to cloud', error)) }, CLOUD_SAVE_DELAY_MS) }
-  async function loadResumeById(resumeId: number) { operationState.value = 'switching'; const response = await getResumeById(resumeId); if (!response.ok) throw new Error(`简历加载失败 (${response.status})`); const payload = await response.json().catch(() => null); cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null; cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null; currentResumeTitle.value = typeof payload?.title === 'string' ? payload.title : '我的简历'; if (payload?.content && typeof payload.content === 'object') { localStorage.setItem(activeStorageKey, JSON.stringify(payload.content)); resetResumeState(); applyResumeData(payload.content) } currentResumeLoaded.value = true; operationState.value = 'idle'; return payload }
-  async function loadFromCloud() { operationState.value = 'loading'; const response = await getCurrentResume(); if (!response.ok) throw new Error(`云端加载失败 (${response.status})`); const payload = await response.json().catch(() => null); cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null; cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null; currentResumeTitle.value = typeof payload?.title === 'string' ? payload.title : '我的简历'; if (payload?.content && typeof payload.content === 'object' && Object.keys(payload.content).length > 0) { localStorage.setItem(activeStorageKey, JSON.stringify(payload.content)); resetResumeState(); applyResumeData(payload.content) } currentResumeLoaded.value = true; await fetchResumeList().catch(() => undefined); operationState.value = 'idle'; return payload }
-  async function createNewResume(title = '新的简历') { operationState.value = 'creating'; const response = await createResume({ title, content: {} }); if (!response.ok) throw new Error(`新建简历失败 (${response.status})`); const payload = await response.json().catch(() => null); cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null; cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null; currentResumeTitle.value = typeof payload?.title === 'string' ? payload.title : title; resetResumeState(); localStorage.setItem(activeStorageKey, JSON.stringify({})); currentResumeLoaded.value = true; await fetchResumeList().catch(() => undefined); operationState.value = 'idle'; return payload }
+  async function loadResumeById(resumeId: number) { operationState.value = 'switching'; const response = await getResumeById(resumeId); if (!response.ok) throw new Error(`简历加载失败 (${response.status})`); const payload = await response.json().catch(() => null); cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null; cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null; currentResumeTitle.value = typeof payload?.title === 'string' ? payload.title : '我的简历'; if (payload?.content && typeof payload.content === 'object') { localStorage.setItem(activeStorageKey, JSON.stringify(payload.content)); resetResumeState(); applyResumeData(payload.content); lastHydratedFingerprint.value = JSON.stringify(payload.content) } currentResumeLoaded.value = true; operationState.value = 'idle'; return payload }
+  async function loadFromCloud() { operationState.value = 'loading'; const response = await getCurrentResume(); if (!response.ok) throw new Error(`云端加载失败 (${response.status})`); const payload = await response.json().catch(() => null); cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null; cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null; currentResumeTitle.value = typeof payload?.title === 'string' ? payload.title : '我的简历'; if (payload?.content && typeof payload.content === 'object' && Object.keys(payload.content).length > 0) { localStorage.setItem(activeStorageKey, JSON.stringify(payload.content)); resetResumeState(); applyResumeData(payload.content); lastHydratedFingerprint.value = JSON.stringify(payload.content) } currentResumeLoaded.value = true; await fetchResumeList().catch(() => undefined); operationState.value = 'idle'; return payload }
+  async function createNewResume(title = '新的简历') { operationState.value = 'creating'; const response = await createResume({ title, content: {} }); if (!response.ok) throw new Error(`新建简历失败 (${response.status})`); const payload = await response.json().catch(() => null); cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : null; cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : null; currentResumeTitle.value = typeof payload?.title === 'string' ? payload.title : title; resetResumeState(); localStorage.setItem(activeStorageKey, JSON.stringify({})); lastHydratedFingerprint.value = JSON.stringify({}); currentResumeLoaded.value = true; await fetchResumeList().catch(() => undefined); operationState.value = 'idle'; return payload }
+  async function renameResumeById(id: number, title: string) {
+    const nextTitle = String(title || '').trim()
+    if (!id || !nextTitle) return null
+    operationState.value = 'saving'
+    markSavingState()
+    try {
+      const current = resumeList.value.find((item) => item.id === id)
+      const response = await updateResumeById(id, {
+        title: nextTitle,
+        content: current && cloudResumeId.value !== id ? undefined : snapshotResumeData(),
+      })
+      if (!response.ok) {
+        const detail = await response.text().catch(() => '')
+        throw new Error(detail || `重命名简历失败 (${response.status})`)
+      }
+      const payload = await response.json().catch(() => null)
+      if (cloudResumeId.value === id || !cloudResumeId.value) {
+        cloudResumeId.value = typeof payload?.id === 'number' ? payload.id : id
+        cloudUpdatedAt.value = typeof payload?.updatedAt === 'string' ? payload.updatedAt : cloudUpdatedAt.value
+        currentResumeTitle.value = typeof payload?.title === 'string' ? payload.title : nextTitle
+      }
+      resumeList.value = resumeList.value.map((item) => item.id === id ? { ...item, title: typeof payload?.title === 'string' ? payload.title : nextTitle, updatedAt: typeof payload?.updatedAt === 'string' ? payload.updatedAt : item.updatedAt } : item)
+      return payload
+    } finally {
+      operationState.value = 'idle'
+    }
+  }
   async function deleteCurrentResume() { if (!cloudResumeId.value) return; operationState.value = 'deleting'; const id = cloudResumeId.value; const response = await deleteResumeById(id); if (!response.ok) throw new Error(`删除简历失败 (${response.status})`); cloudResumeId.value = null; cloudUpdatedAt.value = null; currentResumeTitle.value = '我的简历'; await fetchResumeList(); if (resumeList.value.length > 0) { await loadResumeById(resumeList.value[0].id) } else { resetResumeState(); currentResumeLoaded.value = false; localStorage.setItem(activeStorageKey, JSON.stringify({})); operationState.value = 'idle' } }
 
   function toggleModule(key: string) { const mod = modules.find((m) => m.key === key); if (mod) mod.visible = !mod.visible }
@@ -162,5 +220,5 @@ export const useResumeStore = defineStore('resume', () => {
     saveTimer = setTimeout(() => { saveTimer = null; saveToStorage('auto') }, AUTO_SAVE_DELAY_MS)
   }, { deep: true })
 
-  return { modules, selectedTemplateKey, basicInfo, educationList, skills, workList, projectList, awardList, selfIntro, toggleModule, setTemplate, canMoveModule, moveModule, reorderModule, isDefaultModuleOrder, resetModuleOrder, isModuleVisible, addEducation, removeEducation, addWork, removeWork, addProject, removeProject, canMoveProject, moveProject, addAward, removeAward, exportResumeData, snapshotResumeData, importResumeData, saveToStorage, saveToCloud, scheduleCloudSave, loadFromCloud, loadResumeById, fetchResumeList, createNewResume, deleteCurrentResume, updateStorageKey, autoSaveDelayMs: AUTO_SAVE_DELAY_MS, nextAutoSaveAt, lastSavedAt, lastSaveMode, isSaving, cloudResumeId, cloudUpdatedAt, resumeList, currentResumeTitle, currentResumeLoaded, operationState }
+  return { modules, selectedTemplateKey, basicInfo, educationList, skills, workList, projectList, awardList, selfIntro, toggleModule, setTemplate, canMoveModule, moveModule, reorderModule, isDefaultModuleOrder, resetModuleOrder, isModuleVisible, addEducation, removeEducation, addWork, removeWork, addProject, removeProject, canMoveProject, moveProject, addAward, removeAward, exportResumeData, snapshotResumeData, fingerprintResumeData, importResumeData, saveToStorage, saveToCloud, scheduleCloudSave, loadFromCloud, loadResumeById, fetchResumeList, createNewResume, renameResumeById, deleteCurrentResume, updateStorageKey, clearLocalResumeState, autoSaveDelayMs: AUTO_SAVE_DELAY_MS, nextAutoSaveAt, lastSavedAt, lastSaveMode, isSaving, cloudResumeId, cloudUpdatedAt, resumeList, currentResumeTitle, currentResumeLoaded, operationState, lastHydratedFingerprint }
 })

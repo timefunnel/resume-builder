@@ -46,10 +46,10 @@ class MySqlResumeRepository:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT id, title, updated_at
+                    SELECT id, title, created_at, updated_at
                     FROM resumes
                     WHERE user_id = %s AND is_deleted = 0
-                    ORDER BY updated_at DESC, id DESC
+                    ORDER BY created_at DESC, id DESC
                     """,
                     (int(user_id),),
                 )
