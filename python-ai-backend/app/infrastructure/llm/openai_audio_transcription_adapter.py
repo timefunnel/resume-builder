@@ -10,7 +10,7 @@ from pathlib import Path
 def _normalize_audio_transcription_url(base_url: str | None) -> str:
     raw = (base_url or '').strip().rstrip('/')
     if not raw:
-        return 'https://api.openai.com/v1/audio/transcriptions'
+        return 'https://api.siliconflow.cn/v1/audio/transcriptions'
     if raw.endswith('/v1/audio/transcriptions'):
         return raw
     if raw.endswith('/audio/transcriptions'):
