@@ -17,6 +17,8 @@ def _normalize_audio_transcription_url(base_url: str | None) -> str:
         return raw
     if raw.endswith('/v1'):
         return f'{raw}/audio/transcriptions'
+    if '/v1/' in raw or raw.count('/') >= 3:
+        return raw
     return f'{raw}/v1/audio/transcriptions'
 
 
