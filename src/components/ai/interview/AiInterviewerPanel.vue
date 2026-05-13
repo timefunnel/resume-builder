@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { postAudioTranscriptionChunk, postAudioTranscriptionFinalize } from '@/api/audioTranscriptionApi'
 import AiConfigDialog from '@/components/ai/AiConfigDialog.vue'
 import InterviewSimulationPanel from '@/components/ai/interview/InterviewSimulationPanel.vue'
 import ResumePreviewOverlay from '@/components/ai/interview/ResumePreviewOverlay.vue'
@@ -57,12 +58,13 @@ const TEXT = {
   speechRealtimeLabel: '实时语音',
   speechBrowserLabel: '浏览器识别',
   speechPreferredLabel: '后端语音优先',
+  speechChunkedLabel: '准实时转写',
 } as const
 
 const resumeStore = useResumeStore()
 const aiConfigStore = useAiConfigStore()
 
-type SpeechEngine = 'realtime' | 'browser'
+type SpeechEngine = 'realtime' | 'browser' | 'chunked'
 type SpeechUiState = Exclude<SpeechRuntimeState, 'closed'> | 'idle'
 type FloatingPanel = 'mode' | 'controls'
 type HistoryScope = 'current-resume' | 'all'
@@ -176,6 +178,11 @@ let switchingSpeechEngine = false
 let speechInputPrefix = ''
 let speechTranscript = ''
 let backendSpeechFailureCount = 0
+let chunkRecorder: MediaRecorder | null = null
+let chunkStream: MediaStream | null = null
+let chunkSessionId = ''
+let chunkIndexCounter = 0
+const chunkTranscriptSegments = ref<Array<{ chunkIndex: number; text: string }>>([])
 
 function newMessageId(): string {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -206,6 +213,7 @@ function resolveAssistantLabel(currentMode: InterviewMode): string {
 function resolveSpeechEngineLabel(engine: SpeechEngine | null): string {
   if (engine === 'realtime') return TEXT.speechRealtimeLabel
   if (engine === 'browser') return TEXT.speechBrowserLabel
+  if (engine === 'chunked') return TEXT.speechChunkedLabel
   return aiConfigStore.shouldRequestBackendSpeech ? TEXT.speechPreferredLabel : TEXT.speechBrowserLabel
 }
 
@@ -363,6 +371,11 @@ async function activateSpeechEngine(engine: SpeechEngine) {
 }
 
 async function stopSpeech(clearSpeechText: boolean) {
+  if (activeSpeechEngine.value === 'chunked') {
+    await stopChunkedSpeech(clearSpeechText)
+    return
+  }
+
   const session = speechSession
   speechSession = null
 
@@ -441,12 +454,17 @@ async function startSpeech() {
 
   if (!aiConfigStore.shouldRequestBackendSpeech) {
     try {
-      await activateSpeechEngine('browser')
+      await startChunkedSpeech()
       return
-    } catch (error) {
-      const message = formatErrorMessage(error)
-      errorMsg.value = message
-      return
+    } catch (chunkedError) {
+      try {
+        await activateSpeechEngine('browser')
+        return
+      } catch (error) {
+        const message = formatErrorMessage(error || chunkedError)
+        errorMsg.value = message
+        return
+      }
     }
   }
 
@@ -469,6 +487,91 @@ async function startSpeech() {
       errorMsg.value = `${TEXT.speechUnavailable}\n${realtimeMessage}`
     }
   }
+}
+
+async function stopChunkedSpeech(clearSpeechText: boolean) {
+  if (chunkRecorder && chunkRecorder.state !== 'inactive') {
+    chunkRecorder.stop()
+  }
+  chunkRecorder = null
+  if (chunkStream) {
+    chunkStream.getTracks().forEach((track) => track.stop())
+  }
+  chunkStream = null
+  isListening.value = false
+  speechUiState.value = 'idle'
+  activeSpeechEngine.value = null
+  if (clearSpeechText) {
+    speechTranscript = ''
+    inputText.value = speechInputPrefix
+  } else if (chunkTranscriptSegments.value.length > 0 && chunkSessionId) {
+    try {
+      speechUiState.value = 'transcribing'
+      const finalizeResponse = await postAudioTranscriptionFinalize({
+        sessionId: chunkSessionId,
+        chunks: chunkTranscriptSegments.value.map((item) => ({ chunkIndex: item.chunkIndex, text: item.text })),
+      })
+      const finalizePayload = await finalizeResponse.json().catch(() => null)
+      if (finalizeResponse.ok && finalizePayload?.text) {
+        speechTranscript = String(finalizePayload.text || '').trim()
+        mergeSpeechToInput()
+      }
+    } catch (error) {
+      console.warn('Failed to finalize chunked speech', error)
+    } finally {
+      speechUiState.value = 'idle'
+    }
+  }
+  speechInputPrefix = ''
+}
+
+async function startChunkedSpeech() {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm'
+  const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
+  chunkStream = stream
+  chunkRecorder = recorder
+  chunkSessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  chunkIndexCounter = 0
+  chunkTranscriptSegments.value = []
+  activeSpeechEngine.value = 'chunked'
+  speechUiState.value = 'connected'
+  isListening.value = true
+  recorder.ondataavailable = async (event) => {
+    if (!event.data || event.data.size === 0) return
+    const currentIndex = chunkIndexCounter++
+    try {
+      speechUiState.value = 'transcribing'
+      const response = await postAudioTranscriptionChunk({
+        sessionId: chunkSessionId,
+        chunkIndex: currentIndex,
+        file: event.data,
+        filename: `chunk-${currentIndex}.webm`,
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(String(payload?.detail || `chunk transcription failed (${response.status})`))
+      }
+      const text = String(payload?.text || '').trim()
+      if (!text) return
+      chunkTranscriptSegments.value.push({ chunkIndex: currentIndex, text })
+      const merged = chunkTranscriptSegments.value
+        .slice()
+        .sort((a, b) => a.chunkIndex - b.chunkIndex)
+        .map((item) => item.text)
+        .join('\n')
+        .trim()
+      speechTranscript = merged
+      mergeSpeechToInput()
+    } catch (error) {
+      errorMsg.value = formatErrorMessage(error)
+    } finally {
+      if (chunkRecorder && chunkRecorder.state !== 'inactive') {
+        speechUiState.value = 'connected'
+      }
+    }
+  }
+  recorder.start(2000)
 }
 
 function resetSession() {

@@ -1,6 +1,7 @@
 # author: jf
 """Route registry for FastAPI."""
 
+from app.api.routes.audio_transcription_routes import router as audio_transcription_router
 from app.api.routes.auth_routes import router as auth_router
 from app.api.routes.chat_routes import router as chat_router
 from app.api.routes.interview_routes import router as interview_router
@@ -9,10 +10,11 @@ from app.api.routes.resume_import_routes import router as resume_import_router
 from app.api.routes.rag_routes import router as rag_router
 from app.api.routes.realtime_routes import router as realtime_router
 
-ALL_ROUTERS = (auth_router, chat_router, rag_router, interview_router, resume_router, resume_import_router, realtime_router)
+ALL_ROUTERS = (audio_transcription_router, auth_router, chat_router, rag_router, interview_router, resume_router, resume_import_router, realtime_router)
 
 __all__ = [
     "ALL_ROUTERS",
+    "audio_transcription_router",
     "auth_router",
     "chat_router",
     "rag_router",
