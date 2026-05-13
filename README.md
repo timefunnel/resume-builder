@@ -115,7 +115,15 @@ docker compose down
 copy .env.docker.example .env
 ```
 
-编辑 `.env` 后至少填写真实的 `OPENAI_*_API_KEY`、`DASHSCOPE_API_KEY` 或对应 OpenAI-compatible 上游配置。不要提交包含真实密钥的 `.env` 文件。
+编辑 `.env` 后至少填写真实的 AI 上游配置，不要保留示例占位值。Docker 部署时建议按能力分开检查：
+
+- Chat：`OPENAI_API_KEY` / `OPENAI_CHAT_API_KEY`
+- Embedding：`OPENAI_EMBEDDING_API_KEY` 或对应 `OLLAMA_EMBEDDING_*`
+- Vision OCR：`OPENAI_VISION_API_KEY`
+- Realtime：`DASHSCOPE_API_KEY` 或 `OPENAI_REALTIME_API_KEY`
+- 音频分片转写：`OPENAI_AUDIO_TRANSCRIPTION_API_KEY`
+
+`OPENAI_AUDIO_TRANSCRIPTION_*` 是 Docker 部署里很容易漏掉的一组变量。AI 面试选择“准实时转写”模式时，前端会每隔几秒上传一个音频分片到 `/api/ai/audio/transcriptions/chunk`，后端再调用这个上游转写接口。如果这里仍然是占位值、接口地址不兼容，或者模型与供应商不匹配，页面就会一直停在“识别处理中”。不要提交包含真实密钥的 `.env` 文件。
 
 Windows 推荐使用项目脚本启动，脚本会自动处理本机已有 MySQL 或 PostgreSQL 的端口占用：
 
@@ -189,7 +197,8 @@ docker exec -i resume-builder-pgvector psql -U pgvector -d resume-builder < sql/
 - 数据库未初始化：AI 面试会话表需要 `sql/interview_schema.sql`，RAG 向量表需要 `sql/pgvector_rag_schema.sql`。
 - Nginx 502：确认当前只启动了一套后端 profile，并等待后端 `/health` 通过。
 - WebSocket 失败：确认使用 Spring AI 后端套件时 `/ws/ai/realtime-asr` 可达，并检查 `DASHSCOPE_API_KEY` 或 Realtime 配置。
-- AI Key 缺失：检查 `.env` 或 `.env.docker` 中的 `OPENAI_*_API_KEY`、`DASHSCOPE_API_KEY` 是否仍是占位值。
+- 准实时转写一直显示“识别处理中”：重点检查 `OPENAI_AUDIO_TRANSCRIPTION_BASE_URL`、`OPENAI_AUDIO_TRANSCRIPTION_API_KEY`、`OPENAI_AUDIO_TRANSCRIPTION_MODEL`。默认值面向 SiliconFlow 的 `/v1/audio/transcriptions` 接口，如果你换成别的 OpenAI-compatible 服务，必须确认它真的兼容 multipart 音频转写，而不只是兼容聊天接口。
+- AI Key 缺失：检查 `.env` 或 `.env.docker` 中的 `OPENAI_*_API_KEY`、`DASHSCOPE_API_KEY`、`OPENAI_AUDIO_TRANSCRIPTION_API_KEY` 是否仍是占位值。
 
 ### 启动数据库
 
