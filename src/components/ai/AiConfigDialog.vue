@@ -10,8 +10,10 @@ const emit = defineEmits<{
 }>()
 
 const useBackendSpeech = ref(store.useBackendSpeech)
+const speechMode = ref(store.speechMode)
 
 function handleSave() {
+  store.setSpeechMode(speechMode.value)
   store.setUseBackendSpeech(useBackendSpeech.value)
   emit('close')
 }
@@ -41,6 +43,16 @@ function handleCancel() {
         <p class="dialog-desc">当前仅保留实时语音配置，模型与 API 参数请在后端维护。启用后会优先尝试后端实时语音，失败时回退到浏览器免费语音识别。</p>
 
         <div class="dialog-body">
+          <div class="form-group">
+            <label class="form-label">语音模式</label>
+            <div class="mode-options">
+              <label class="mode-option"><input v-model="speechMode" type="radio" value="backend" /> <span>后端实时优先</span></label>
+              <label class="mode-option"><input v-model="speechMode" type="radio" value="chunked" /> <span>准实时转写</span></label>
+              <label class="mode-option"><input v-model="speechMode" type="radio" value="browser" /> <span>浏览器识别</span></label>
+            </div>
+            <span class="form-hint">准实时转写会每隔几秒上传一段音频，用 SiliconFlow 做分片转写，结束后再用 gpt-5.4-mini 整理全文。</span>
+          </div>
+
           <div class="form-group">
             <label class="form-label">语音路由</label>
             <label class="switch-row">
@@ -181,6 +193,10 @@ function handleCancel() {
   font-size: 11px;
   color: #a89888;
 }
+
+.mode-options { display:flex; flex-direction:column; gap:8px; margin-bottom:6px; }
+.mode-option { display:flex; align-items:center; gap:8px; font-size:12px; color:#5c4f44; }
+.mode-option input[type='radio'] { width:14px; height:14px; }
 
 .switch-row {
   display: inline-flex;

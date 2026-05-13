@@ -452,6 +452,26 @@ async function startSpeech() {
   speechUiState.value = 'idle'
   mergeSpeechToInput()
 
+  if (aiConfigStore.shouldUseChunkedSpeech) {
+    try {
+      await startChunkedSpeech()
+      return
+    } catch (error) {
+      errorMsg.value = formatErrorMessage(error)
+      return
+    }
+  }
+
+  if (aiConfigStore.shouldUseBrowserSpeechOnly) {
+    try {
+      await activateSpeechEngine('browser')
+      return
+    } catch (error) {
+      errorMsg.value = formatErrorMessage(error)
+      return
+    }
+  }
+
   if (!aiConfigStore.shouldRequestBackendSpeech) {
     try {
       await startChunkedSpeech()

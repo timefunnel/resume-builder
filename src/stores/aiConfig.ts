@@ -7,6 +7,7 @@ export interface AiConfig {
   modelName: string
   useBackendSpeech: boolean
   backendSpeechAutoDisabled: boolean
+  speechMode?: 'backend' | 'chunked' | 'browser'
 }
 
 const STORAGE_KEY = 'resume-builder-ai-config'
@@ -17,13 +18,16 @@ export const useAiConfigStore = defineStore('aiConfig', () => {
   const modelName = ref('')
   const useBackendSpeech = ref(true)
   const backendSpeechAutoDisabled = ref(false)
+  const speechMode = ref<'backend' | 'chunked' | 'browser'>('backend')
 
   const isConfigured = computed(
     () => apiUrl.value.trim() !== '' && apiToken.value.trim() !== '' && modelName.value.trim() !== '',
   )
   const shouldRequestBackendSpeech = computed(
-    () => useBackendSpeech.value && !backendSpeechAutoDisabled.value,
+    () => speechMode.value === 'backend' && useBackendSpeech.value && !backendSpeechAutoDisabled.value,
   )
+  const shouldUseChunkedSpeech = computed(() => speechMode.value === 'chunked')
+  const shouldUseBrowserSpeechOnly = computed(() => speechMode.value === 'browser')
 
   function loadFromStorage() {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -37,6 +41,9 @@ export const useAiConfigStore = defineStore('aiConfig', () => {
       if (typeof data.backendSpeechAutoDisabled === 'boolean') {
         backendSpeechAutoDisabled.value = data.backendSpeechAutoDisabled
       }
+      if (data.speechMode === 'backend' || data.speechMode === 'chunked' || data.speechMode === 'browser') {
+        speechMode.value = data.speechMode
+      }
     } catch {
       console.warn('Failed to load AI config from localStorage')
     }
@@ -49,6 +56,7 @@ export const useAiConfigStore = defineStore('aiConfig', () => {
       modelName: modelName.value,
       useBackendSpeech: useBackendSpeech.value,
       backendSpeechAutoDisabled: backendSpeechAutoDisabled.value,
+      speechMode: speechMode.value,
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   }
@@ -62,6 +70,14 @@ export const useAiConfigStore = defineStore('aiConfig', () => {
       if (config.useBackendSpeech) {
         backendSpeechAutoDisabled.value = false
       }
+    }
+    saveToStorage()
+  }
+
+  function setSpeechMode(mode: 'backend' | 'chunked' | 'browser') {
+    speechMode.value = mode
+    if (mode !== 'backend') {
+      backendSpeechAutoDisabled.value = false
     }
     saveToStorage()
   }
@@ -104,9 +120,13 @@ export const useAiConfigStore = defineStore('aiConfig', () => {
     modelName,
     useBackendSpeech,
     backendSpeechAutoDisabled,
+    speechMode,
     shouldRequestBackendSpeech,
+    shouldUseChunkedSpeech,
+    shouldUseBrowserSpeechOnly,
     isConfigured,
     updateConfig,
+    setSpeechMode,
     setUseBackendSpeech,
     markBackendSpeechUnavailable,
     clearBackendSpeechUnavailable,
