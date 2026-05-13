@@ -30,6 +30,7 @@ const currentUserLabel = computed(() => authStore.user?.nickname?.trim() || auth
 type ThemeMode = 'light' | 'dark'
 const THEME_STORAGE_KEY = 'resume-builder-theme'
 const themeMode = ref<ThemeMode>(resolveInitialThemeMode())
+const bootstrapping = ref(true)
 
 function resolveInitialThemeMode(): ThemeMode {
   if (typeof window === 'undefined') return 'light'
@@ -88,12 +89,25 @@ function syncMenuFromLocation() {
 async function handleAuthSuccess() {
   const user = authStore.user
   if (!user) return
+  resumeStore.clearLocalResumeState(true)
+  if (typeof window !== 'undefined') {
+    const targetPath = resolvePrimaryMenuPath('resume-editor')
+    if (window.location.pathname === targetPath) {
+      window.location.reload()
+    } else {
+      window.location.assign(targetPath)
+    }
+    return
+  }
   await postAuthBootstrap(user.id)
 }
 
 async function postAuthBootstrap(userId?: number | null) {
   resumeStore.updateStorageKey(userId ?? null)
-  if (!userId) return
+  if (!userId) {
+    resumeStore.clearLocalResumeState(true)
+    return
+  }
   try {
     await resumeStore.loadFromCloud().catch(() => undefined)
     const list = await resumeStore.fetchResumeList().catch(() => [])
@@ -122,15 +136,21 @@ function handleSelectMenu(key: PrimaryMenuKey) {
 }
 
 onMounted(() => {
-  authStore.fetchMe().then((user) => {
-    if (user) {
-      void postAuthBootstrap(user.id)
-    } else {
-      resumeStore.updateStorageKey(null)
-    }
-  }).catch(() => undefined)
   syncMenuFromLocation()
   window.addEventListener('popstate', syncMenuFromLocation)
+  ;(async () => {
+    try {
+      const user = await authStore.fetchMe().catch(() => null)
+      if (user) {
+        await postAuthBootstrap(user.id)
+      } else {
+        resumeStore.updateStorageKey(null)
+        resumeStore.clearLocalResumeState(true)
+      }
+    } finally {
+      bootstrapping.value = false
+    }
+  })()
 })
 
 onUnmounted(() => {
@@ -139,10 +159,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="!authStore.initialized" class="auth-gate-shell" :class="{ dark: themeMode === 'dark' }">
+  <div v-if="!authStore.initialized || bootstrapping" class="auth-gate-shell" :class="{ dark: themeMode === 'dark' }">
     <div class="auth-gate-card auth-gate-card--loading">
-      <h1>正在检查登录状态…</h1>
-      <p>请稍候，马上带你进入系统。</p>
+      <h1>正在同步账户数据…</h1>
+      <p>请稍候，正在进入简历编辑并拉取云端最新数据。</p>
     </div>
   </div>
 

@@ -19,6 +19,7 @@ const authStore = useAuthStore()
 const authMode = ref<AuthMode>('login')
 const authError = ref('')
 const authSuccess = ref('')
+const redirecting = ref(false)
 const form = reactive({
   email: '',
   password: '',
@@ -47,6 +48,7 @@ function switchAuthMode(mode: AuthMode) {
 async function submitAuth() {
   authError.value = ''
   authSuccess.value = ''
+  redirecting.value = false
   try {
     if (authMode.value === 'register') {
       await authStore.register({
@@ -54,14 +56,17 @@ async function submitAuth() {
         password: form.password,
         nickname: form.nickname || undefined,
       })
-      authSuccess.value = '注册并登录成功'
-      emit('auth-success')
     } else {
       await authStore.login({ email: form.email, password: form.password })
-      authSuccess.value = '登录成功'
-      emit('auth-success')
+    }
+    redirecting.value = true
+    emit('auth-success')
+    if (typeof window !== 'undefined') {
+      window.location.replace('/')
+      return
     }
   } catch (error) {
+    redirecting.value = false
     authError.value = error instanceof Error ? error.message : '操作失败'
   }
 }
@@ -80,7 +85,13 @@ async function handleLogout() {
 
 <template>
   <main class="account-settings-panel" :class="{ dark: props.themeMode === 'dark' }">
-    <div class="settings-stack">
+    <div v-if="redirecting" class="auth-redirecting">
+      <div class="auth-redirecting-card">
+        <h2>正在进入系统…</h2>
+        <p>登录成功，正在跳转到简历编辑并同步最新数据。</p>
+      </div>
+    </div>
+    <div v-else class="settings-stack">
       <section class="theme-setting-card" aria-labelledby="theme-setting-title">
         <div class="theme-setting-main">
           <span class="theme-setting-icon" aria-hidden="true">
@@ -118,7 +129,7 @@ async function handleLogout() {
             <p v-if="isLoggedIn">当前已登录：{{ currentUserLabel }}</p>
             <p v-else>请先注册或登录，登录后才能进入系统并隔离简历、面试与知识库数据</p>
           </div>
-          <button v-if="isLoggedIn" class="ghost-button" type="button" :disabled="authStore.loading" @click="handleLogout">
+          <button v-if="isLoggedIn" class="ghost-button" type="button" :disabled="authStore.loading || redirecting" @click="handleLogout">
             退出登录
           </button>
         </div>
@@ -142,14 +153,14 @@ async function handleLogout() {
               <span>昵称</span>
               <input v-model.trim="form.nickname" type="text" maxlength="100" placeholder="可选" />
             </label>
-            <button class="primary-button" type="submit" :disabled="authStore.loading">
-              {{ authStore.loading ? '处理中...' : authMode === 'register' ? '注册并登录' : '登录' }}
+            <button class="primary-button" type="submit" :disabled="authStore.loading || redirecting">
+              {{ redirecting ? '正在进入简历编辑...' : authStore.loading ? '处理中...' : authMode === 'register' ? '注册并登录' : '登录' }}
             </button>
           </form>
         </template>
 
         <p v-if="authError" class="auth-error">{{ authError }}</p>
-        <p v-if="authSuccess" class="auth-success">{{ authSuccess }}</p>
+        <p v-if="authSuccess && !redirecting" class="auth-success">{{ authSuccess }}</p>
       </section>
     </div>
   </main>
@@ -194,6 +205,10 @@ async function handleLogout() {
   background: radial-gradient(circle at 18% 10%, rgba(240, 138, 69, 0.12), transparent 28%), linear-gradient(135deg, #100f0d 0%, #18120d 100%);
 }
 .settings-stack { width: min(720px, 100%); display: flex; flex-direction: column; gap: 18px; }
+.auth-redirecting { width:min(720px, 100%); display:flex; align-items:center; justify-content:center; min-height: 280px; }
+.auth-redirecting-card { width:min(420px, 100%); padding:24px; border-radius:24px; border:1px solid var(--config-border); background: linear-gradient(135deg, rgba(255, 255, 255, 0.52), transparent), var(--config-surface); box-shadow: var(--config-shadow); }
+.auth-redirecting-card h2 { margin:0 0 8px; color:var(--config-text); font-size:20px; font-weight:900; }
+.auth-redirecting-card p { margin:0; color:var(--config-muted); font-size:13px; line-height:1.6; font-weight:700; }
 .theme-setting-card, .auth-card {
   padding: 18px;
   border: 1px solid var(--config-border);
@@ -232,10 +247,14 @@ async function handleLogout() {
 .auth-error { color: var(--config-danger); }
 .auth-success { color: var(--config-success); }
 @media (max-width: 760px) {
-  .account-settings-panel { padding: 8px; }
+  .account-settings-panel { padding: 8px 8px calc(96px + env(safe-area-inset-bottom)); }
+  .settings-stack { gap: 12px; }
   .theme-setting-card, .auth-card { padding: 12px; border-radius: 16px; }
   .auth-card-head { align-items: flex-start; flex-direction: column; }
   .theme-setting-main { gap: 8px; }
   .theme-setting-icon { width: 30px; height: 30px; border-radius: 10px; }
+  .ghost-button { width: 100%; min-height: 38px; }
+  .theme-toggle-group, .auth-tabs { width: 100%; }
+  .theme-toggle-option, .auth-tab { flex: 1; }
 }
 </style>

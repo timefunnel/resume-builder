@@ -12,6 +12,22 @@ async function parseJson(response: Response) {
   }
 }
 
+function clearResumeBuilderLocalStorage() {
+  if (typeof window === 'undefined') return
+  try {
+    const keys: string[] = []
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const key = window.localStorage.key(i)
+      if (key && (key === 'resume-builder-data' || key.startsWith('resume-builder-data:user:'))) {
+        keys.push(key)
+      }
+    }
+    keys.forEach((key) => window.localStorage.removeItem(key))
+  } catch (error) {
+    console.warn('Failed to clear resume builder localStorage', error)
+  }
+}
+
 function extractErrorMessage(payload: unknown, fallback: string): string {
   if (payload && typeof payload === 'object') {
     const obj = payload as Record<string, unknown>
@@ -53,6 +69,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (!response.ok) {
         throw new Error(extractErrorMessage(data, `注册失败 (${response.status})`))
       }
+      clearResumeBuilderLocalStorage()
       user.value = data as AuthUserProfile
       initialized.value = true
       return user.value
@@ -69,6 +86,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (!response.ok) {
         throw new Error(extractErrorMessage(data, `登录失败 (${response.status})`))
       }
+      clearResumeBuilderLocalStorage()
       user.value = data as AuthUserProfile
       initialized.value = true
       return user.value
@@ -81,6 +99,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     try {
       await postLogout()
+      clearResumeBuilderLocalStorage()
       user.value = null
       initialized.value = true
     } finally {
