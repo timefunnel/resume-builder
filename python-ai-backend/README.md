@@ -114,6 +114,7 @@ start-python-backend.bat
 - Embedding：`EMBEDDING_PROVIDER`、`OPENAI_EMBEDDING_*`、`OLLAMA_EMBEDDING_*`
 - Vision OCR：`OPENAI_VISION_*`
 - Realtime：`OPENAI_REALTIME_*`
+- Audio Transcription：`OPENAI_AUDIO_TRANSCRIPTION_*`
 - MySQL：`MYSQL_DATASOURCE_*`
 - pgvector：`PGVECTOR_DATASOURCE_*`
 - RAG：`RAG_CHUNK_SIZE`、`RAG_CHUNK_OVERLAP`、`RAG_MAX_FILE_SIZE_MB`
@@ -123,6 +124,7 @@ start-python-backend.bat
 - `SERVER_PORT` 建议保持 `8999`，与前端代理一致。
 - `APP_INTERVIEW_RAG_TOP_K`、`APP_INTERVIEW_RAG_SIMILARITY_THRESHOLD`、`APP_INTERVIEW_RAG_TIMEOUT_SECONDS` 仅用于 AI 面试链路。
 - `OPENAI_REALTIME_*` 用于 `/api/ai/realtime/client-secret` 链路；前端会用返回的临时密钥和 Realtime 地址建立 WebRTC 连接。
+- `OPENAI_AUDIO_TRANSCRIPTION_*` 用于 `/api/ai/audio/transcriptions/chunk` 分片转写链路。AI 面试切到“准实时转写”模式后，这组变量如果仍是占位值、接口地址不兼容，或者模型与供应商不匹配，页面就会一直停在“识别处理中”。
 - 当前 Python 后端不再提供 `/ws/ai/realtime-asr` 这类后端专属语音 WebSocket 桥接。
 
 ## 与 Spring 后端的关系
@@ -149,3 +151,4 @@ start-python-backend.bat
 - 后端启动失败时，先检查 `.env` 中的数据库连接和端口是否与容器一致。
 - 浏览器提示获取实时语音会话失败时，先检查 `python-ai-backend/.env` 里的 `OPENAI_REALTIME_*` 或通用 `OPENAI_API_KEY` 是否已正确配置。
 - 浏览器语音自动回退到免费识别时，通常是 `/api/ai/realtime/client-secret` 链路或上游 Realtime 配置异常，可先看 FastAPI 日志里的 realtime client-secret 错误。
+- AI 面试在“准实时转写”模式下一直显示“识别处理中”时，优先检查 `OPENAI_AUDIO_TRANSCRIPTION_BASE_URL`、`OPENAI_AUDIO_TRANSCRIPTION_API_KEY`、`OPENAI_AUDIO_TRANSCRIPTION_MODEL`。默认值面向 SiliconFlow 的 `/v1/audio/transcriptions` 接口，如果你换成别的 OpenAI-compatible 服务，必须确认它真的支持 multipart 音频转写。
