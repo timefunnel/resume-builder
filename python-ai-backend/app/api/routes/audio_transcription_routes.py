@@ -19,7 +19,7 @@ def _build_audio_transcriber() -> OpenAIAudioTranscriptionAdapter:
     return OpenAIAudioTranscriptionAdapter(
         api_key=settings.openai_api_key,
         model_name=os.getenv('OPENAI_AUDIO_TRANSCRIPTION_MODEL', 'FunAudioLLM/SenseVoiceSmall'),
-        base_url=os.getenv('OPENAI_AUDIO_TRANSCRIPTION_BASE_URL', settings.openai_base_url),
+        base_url='https://api.siliconflow.cn/v1/audio/transcriptions',
         timeout_seconds=max(3.0, float(os.getenv('OPENAI_AUDIO_TRANSCRIPTION_TIMEOUT_SECONDS', '60'))),
     )
 
